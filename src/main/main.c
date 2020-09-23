@@ -1,11 +1,3 @@
-/* WiFi station Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -20,14 +12,13 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "esp_http_client.h"
+#include "include/wifi_login.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_WIFI_SSID      "lee_wifi"
-#define EXAMPLE_ESP_WIFI_PASS      "leepeepee"
 #define EXAMPLE_ESP_MAXIMUM_RETRY  5
 
 /* FreeRTOS event group to signal when we are connected*/
@@ -137,18 +128,23 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+
+    // Check if not connected, and keep trying again and again?
     wifi_init_sta();
 
     esp_err_t err;
+    // Add correct website domain later
     esp_http_client_config_t config = {
         .url = "http://boilerbot-289518.uc.r.appspot.com/admin/test",
         .method = HTTP_METHOD_GET,
     };
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if ((err = esp_http_client_open(client, 0)) != ESP_OK){
         printf("Error opening client connection\n");
     }
     
+    // Get content-length
     int content_length;
     if ((content_length = esp_http_client_fetch_headers(client)) == ESP_FAIL){
         printf("Error fetching headers\n");
@@ -157,7 +153,10 @@ void app_main(void)
         printf("Content-Length: %d\n", content_length);
     }
 
+    // Get http status code
     printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
+
+    // read actual http data
     char buf[1024];
     int read_bytes;
     while ((read_bytes = esp_http_client_read(client, buf, 1024)) != 0){
@@ -167,6 +166,7 @@ void app_main(void)
 
     printf("\n");
 
+    // cleanup and close http connection
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
 }
