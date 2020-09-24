@@ -13,7 +13,7 @@
 #include "lwip/sys.h"
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
-#include "include/astar.h"
+#include "astar.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -118,6 +118,14 @@ void wifi_init_sta(void)
     vEventGroupDelete(s_wifi_event_group);
 }
 
+void getRequest(char* buf, Point * start, Point * end) {
+    
+    start->x = (buf[0] - 48) * 10 + (buf[1] - 48);
+    start->y = (buf[3] - 48) * 10 + (buf[4] - 48);
+    end->x = (buf[6] - 48) * 10 + (buf[7] - 48);
+    end->y = (buf[9] - 48) * 10 + (buf[10] - 48);
+}
+
 void app_main(void)
 {
     //Initialize NVS
@@ -151,23 +159,32 @@ void app_main(void)
         printf("Error fetching headers\n");
     }
     else{
-        printf("Content-Length: %d\n", content_length);
+        printf("Content Length: %d\n", content_length);
     }
 
     // Get http status code
     printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
-
-    // read actual http data
-    char buf[1024];
-    int read_bytes;
-    while ((read_bytes = esp_http_client_read(client, buf, 1024)) != 0){
+    
+    // while (1) {
+        // read actual http data
+        char buf[13] = "0000000000000";
+        int read_bytes;
+        read_bytes = esp_http_client_read(client, (char *) buf, 12);
         buf[read_bytes] = '\0';
-        printf("%s", buf);
-    }
+        printf("%d bytes read: %s\n", read_bytes, buf);
 
-    printf("\n");
+        Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
+        getRequest(buf, &start, &end);
+
+        // Path* path = getPathAStar(11, 11, fplan, start, end);
+        // printPath(path);
+
+        printf("%d %d %d %d\n", start.x, start.y, end.x, end.y);
+    // }
 
     // cleanup and close http connection
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
+
+    printf("Exiting...\n");
 }
