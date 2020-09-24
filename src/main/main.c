@@ -13,6 +13,7 @@
 #include "lwip/sys.h"
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
+#include "include/astar.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
