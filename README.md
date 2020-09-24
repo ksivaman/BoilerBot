@@ -21,3 +21,7 @@ Indoor delivery bot
     #define EXAMPLE_ESP_WIFI_PASS      "<your wifi password>"
     ```
 4. build, and flash
+    ```
+    idf.py build
+    idf.py -p PORT flash monitor
+    ```
