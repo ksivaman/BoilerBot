@@ -2,7 +2,7 @@
 Indoor delivery bot
 
 ## To use:
-1. Open the ESP_IDF folder (parent folder containing all exaxmples, includes etc.)
+1. Open the ESP_IDF folder (parent folder containing all examples, includes etc.)
 2. Execute the following commands
     ```
     git clone https://github.com/ksivaman/BoilerBot

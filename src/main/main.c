@@ -135,7 +135,7 @@ void app_main(void)
     esp_err_t err;
     // Add correct website domain later
     esp_http_client_config_t config = {
-        .url = "http://boilerbot-289518.uc.r.appspot.com/admin/test",
+        .url = "http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue",
         .method = HTTP_METHOD_GET,
     };
 
