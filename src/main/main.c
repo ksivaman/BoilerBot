@@ -171,15 +171,11 @@ void app_main(void)
         int read_bytes;
         read_bytes = esp_http_client_read(client, (char *) buf, 12);
         buf[read_bytes] = '\0';
-        printf("%d bytes read: %s\n", read_bytes, buf);
-
         Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
         getRequest(buf, &start, &end);
 
-        Path* path = getPathAStar(11, 11, fplan, start, end);
+        Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
         printPath(path);
-
-        printf("%d %d %d %d\n", start.x, start.y, end.x, end.y);
     // }
 
     // cleanup and close http connection
