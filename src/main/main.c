@@ -13,7 +13,7 @@
 #include "lwip/sys.h"
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
-#include "astar.h"
+#include "astar.c"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -176,8 +176,8 @@ void app_main(void)
         Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
         getRequest(buf, &start, &end);
 
-        // Path* path = getPathAStar(11, 11, fplan, start, end);
-        // printPath(path);
+        Path* path = getPathAStar(11, 11, fplan, start, end);
+        printPath(path);
 
         printf("%d %d %d %d\n", start.x, start.y, end.x, end.y);
     // }
