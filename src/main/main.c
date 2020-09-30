@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdio.h>
+#include "driver/gpio.h"
+#include "sdkconfig.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,6 +17,8 @@
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
 #include "astar.c"
+
+#define BLINK_GPIO 4
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -126,25 +131,11 @@ void getRequest(char* buf, Point * start, Point * end) {
     end->y = (buf[9] - 48) * 10 + (buf[10] - 48);
 }
 
-void app_main(void)
-{
-    //Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-
-    // Check if not connected, and keep trying again and again?
-    wifi_init_sta();
-
+int get_url_content(const char url[], char buf[], int length) {
     esp_err_t err;
     // Add correct website domain later
     esp_http_client_config_t config = {
-        .url = "http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue",
+        .url = url,
         .method = HTTP_METHOD_GET,
     };
 
@@ -164,23 +155,57 @@ void app_main(void)
 
     // Get http status code
     printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
-    
-    // while (1) {
-        // read actual http data
-        char buf[13] = "0000000000000";
-        int read_bytes;
-        read_bytes = esp_http_client_read(client, (char *) buf, 12);
-        buf[read_bytes] = '\0';
-        Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
-        getRequest(buf, &start, &end);
 
-        Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
-        printPath(path);
-    // }
+    int read_bytes;
+    // char buffer[1024];
+    read_bytes = esp_http_client_read(client, buf, length);
+    buf[read_bytes] = '\0';
+    // printf("%s\n", buf);
 
-    // cleanup and close http connection
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
+    return read_bytes;
+}
+
+void app_main(void)
+{
+    //Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+
+    // Check if not connected, and keep trying again and again
+    wifi_init_sta();
+
+    char buf[1024];
+    int read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue", buf, 12);
+    printf("%s\n", buf);
+
+    Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
+    getRequest(buf, &start, &end);
+
+    Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
+    printPath(path);
+
+    gpio_pad_select_gpio(BLINK_GPIO);
+    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+    while(1){
+        read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
+        if (buf[0] == 'y') {
+            gpio_set_level(BLINK_GPIO, 1);
+            vTaskDelay(5000/ portTICK_PERIOD_MS);
+        } 
+        gpio_set_level(BLINK_GPIO, 0);
+        vTaskDelay(1000/ portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    // cleanup and close http connection
 
     printf("Exiting...\n");
 }
