@@ -17,6 +17,7 @@
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
 #include "astar.c"
+#include "compass.c"
 
 #define BLINK_GPIO 4
 
@@ -180,30 +181,34 @@ void app_main(void)
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 
     // Check if not connected, and keep trying again and again
-    wifi_init_sta();
+                            // wifi_init_sta();
 
-    char buf[1024];
-    int read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue", buf, 12);
-    printf("%s\n", buf);
+                            // char buf[1024];
+                            // int read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue", buf, 12);
 
-    Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
-    getRequest(buf, &start, &end);
+                            // Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
+                            // getRequest(buf, &start, &end);
+                            // printf("Start: (%d, %d); End: (%d, %d)\n", start.x, start.y, end.x, end.y);
 
-    Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
-    printPath(path);
 
-    gpio_pad_select_gpio(BLINK_GPIO);
-    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
-    while(1){
-        read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
-        if (buf[0] == 'y') {
-            gpio_set_level(BLINK_GPIO, 1);
-            vTaskDelay(5000/ portTICK_PERIOD_MS);
-        } 
-        gpio_set_level(BLINK_GPIO, 0);
-        vTaskDelay(1000/ portTICK_PERIOD_MS);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+                            // Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
+                            // printPath(path);
+
+                            // gpio_pad_select_gpio(BLINK_GPIO);
+                            // gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+
+    i2c_master_sensor_test();
+
+    // while(1){
+    //     read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
+    //     if (buf[0] == 'y') {
+    //         gpio_set_level(BLINK_GPIO, 1);
+    //         vTaskDelay(5000/ portTICK_PERIOD_MS);
+    //     } 
+    //     gpio_set_level(BLINK_GPIO, 0);
+    //     vTaskDelay(1000/ portTICK_PERIOD_MS);
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
 
     // cleanup and close http connection
 
