@@ -235,7 +235,7 @@ void app_main(void) {
     getRequest(buf, &start, &end);
     printf("Start: (%d, %d); End: (%d, %d)\n", start.x, start.y, end.x, end.y);
 
-    // TODO: Get path from curr to start, and navigate
+    // Get path from curr to start, and navigate
     Path* path = getPathAStar(NROWS, NCOLS, fplan, curr, start);
     printPath(path);
 
@@ -265,7 +265,6 @@ void app_main(void) {
     get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/set_reached_destination", buf, 3);
 
 
-    // TODO: unlock
     printf("__________ Waiting for receiver to end delivery...\n");
     while ((read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/has_delivery_ended", buf, 3)) <= 2){
         // Poll website every second
@@ -281,19 +280,3 @@ void app_main(void) {
     // i2c_master_sensor_test();
     printf("__________ Done. Successfully I hope...\n");
 }
-
-// void pseudo_main(void){
-//     - idle 
-//     - wait for presence of delivery on website 
-//     - calculate path from current to next using a*
-
-//     - go to sender
-//     - wait for send commmand, and lock/unlock in parallel
-//     - go to recver 
-//     - wait for recvd, and lock/unlock in parallel
-//     - go to idle
-// }
-
-// void pseudo_paralle(){
-//     - lock: continuously poll, and unlock
-// }
