@@ -19,7 +19,7 @@
 #include "astar.c"
 #include "compass.c"
 
-#define BLINK_GPIO 4
+#define LOCK_GPIO 4
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -41,9 +41,7 @@ static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
-static void event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
+static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -63,8 +61,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_sta(void)
-{
+void wifi_init_sta(void) {
     s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -150,12 +147,12 @@ int get_url_content(const char url[], char buf[], int length) {
     if ((content_length = esp_http_client_fetch_headers(client)) == ESP_FAIL){
         printf("Error fetching headers\n");
     }
-    else{
-        printf("Content Length: %d\n", content_length);
-    }
+    // else{
+    //     printf("Content Length: %d\n", content_length);
+    // }
 
     // Get http status code
-    printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
+    // printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
 
     int read_bytes;
     // char buffer[1024];
@@ -168,49 +165,135 @@ int get_url_content(const char url[], char buf[], int length) {
     return read_bytes;
 }
 
-void app_main(void)
-{
+void unlock(){
+    printf("__________ Unlocking...\n");
+    gpio_set_level(LOCK_GPIO, 1);
+    vTaskDelay(5000/ portTICK_PERIOD_MS);
+
+    printf("__________ Locking...\n");
+    gpio_set_level(LOCK_GPIO, 0);
+    vTaskDelete( NULL );
+}
+
+void create_unlock_task(void) {
+    BaseType_t xReturned;
+
+    /* Create the task, storing the handle. */
+    xReturned = xTaskCreate(
+                    unlock,                 /* Function that implements the task. */
+                    "unlock the lock",     /* Text name for the task. */
+                    1000,                 /* Stack size in words, not bytes. */
+                    NULL,               /* Parameter passed into the task. */
+                    1,                  /* Priority at which the task is created. */
+                    NULL );             /* Used to pass out the created task's handle. */
+}
+
+
+
+void app_main(void) {
+    int read_bytes;
+    Point start, end, curr; 
+    start.x = 0; start.y = 0; end.x = 0; end.y = 0;
+    curr.x = 2; curr.y = 1;
+    char buf[1024];
+
+    printf("__________ Wassup. Im here. Back at work. Lets go...\n");
+
     //Initialize NVS
     esp_err_t ret = nvs_flash_init();
+    printf("__________ Initialized flash...\n");
+
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
       ret = nvs_flash_init();
     }
+
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 
+    // Setup block
+    // Setup lock gpio
+    gpio_pad_select_gpio(LOCK_GPIO);
+    gpio_set_direction(LOCK_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(LOCK_GPIO, 0);
+
     // Check if not connected, and keep trying again and again
-                            // wifi_init_sta();
+    wifi_init_sta();
+    printf("__________ Initialized wifi!\n");
 
-                            // char buf[1024];
-                            // int read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue", buf, 12);
+    // Wait till there is a request
+    printf("__________ Waiting for new delivery request...\n");
+    while ((read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/get_from_queue", buf, 12)) <= 2){
+        // Poll website every second
+        vTaskDelay(1000/ portTICK_PERIOD_MS);
+    }
 
-                            // Point start, end; start.x = 0; start.y = 0; end.x = 0; end.y = 0;
-                            // getRequest(buf, &start, &end);
-                            // printf("Start: (%d, %d); End: (%d, %d)\n", start.x, start.y, end.x, end.y);
+    // Request found
+    printf("__________ Found new delivery request!\n");
+
+    getRequest(buf, &start, &end);
+    printf("Start: (%d, %d); End: (%d, %d)\n", start.x, start.y, end.x, end.y);
+
+    // TODO: Get path from curr to start, and navigate
+    Path* path = getPathAStar(NROWS, NCOLS, fplan, curr, start);
+    printPath(path);
+
+    // Go from curr to start
+    printf("__________ Navigating from curr to start...\n");
+    // TODO: navigate(path);
+
+    printf("__________ Waiting for sender to start delivery...\n");
+    while ((read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/has_delivery_started", buf, 3)) <= 2){
+        // Poll website every second
+        read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
+        if (buf[0] == 'y') {
+            create_unlock_task();
+        } 
+        vTaskDelay(1000/ portTICK_PERIOD_MS);
+    }
+
+    // Go from start to end
+    path = getPathAStar(NROWS, NCOLS, fplan, start, end);
+    printPath(path);
 
 
-                            // Path* path = getPathAStar(NROWS, NCOLS, fplan, start, end);
-                            // printPath(path);
+    // TODO: navigate(path);
+    printf("__________ Navigating from start to end...\n");
+    vTaskDelay(30000/ portTICK_PERIOD_MS); // simulating the navigate func
+    printf("__________ Reached destination!\n");
+    get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/set_reached_destination", buf, 3);
 
-                            // gpio_pad_select_gpio(BLINK_GPIO);
-                            // gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
-    i2c_master_sensor_test();
+    // TODO: unlock
+    printf("__________ Waiting for receiver to end delivery...\n");
+    while ((read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/has_delivery_ended", buf, 3)) <= 2){
+        // Poll website every second
+        read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
+        if (buf[0] == 'y') {
+            create_unlock_task();
+        } 
+        vTaskDelay(1000/ portTICK_PERIOD_MS);
+    }
 
-    // while(1){
-    //     read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/check_unlock", buf, 1);
-    //     if (buf[0] == 'y') {
-    //         gpio_set_level(BLINK_GPIO, 1);
-    //         vTaskDelay(5000/ portTICK_PERIOD_MS);
-    //     } 
-    //     gpio_set_level(BLINK_GPIO, 0);
-    //     vTaskDelay(1000/ portTICK_PERIOD_MS);
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
+    printf("__________ Delivery completed. Going idle...\n");
 
-    // cleanup and close http connection
-
-    printf("Exiting...\n");
+    // i2c_master_sensor_test();
+    printf("__________ Done. Successfully I hope...\n");
 }
+
+// void pseudo_main(void){
+//     - idle 
+//     - wait for presence of delivery on website 
+//     - calculate path from current to next using a*
+
+//     - go to sender
+//     - wait for send commmand, and lock/unlock in parallel
+//     - go to recver 
+//     - wait for recvd, and lock/unlock in parallel
+//     - go to idle
+// }
+
+// void pseudo_paralle(){
+//     - lock: continuously poll, and unlock
+// }
