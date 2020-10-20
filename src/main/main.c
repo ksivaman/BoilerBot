@@ -147,19 +147,12 @@ int get_url_content(const char url[], char buf[], int length) {
     if ((content_length = esp_http_client_fetch_headers(client)) == ESP_FAIL){
         printf("Error fetching headers\n");
     }
-    // else{
-    //     printf("Content Length: %d\n", content_length);
-    // }
-
-    // Get http status code
-    // printf("HTTP Status Code: %d\n", esp_http_client_get_status_code(client));
 
     int read_bytes;
-    // char buffer[1024];
     read_bytes = esp_http_client_read(client, buf, length);
     buf[read_bytes] = '\0';
-    // printf("%s\n", buf);
 
+    //cleanup
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
     return read_bytes;
@@ -181,11 +174,11 @@ void create_unlock_task(void) {
     /* Create the task, storing the handle. */
     xReturned = xTaskCreate(
                     unlock,                 /* Function that implements the task. */
-                    "unlock the lock",     /* Text name for the task. */
-                    1000,                 /* Stack size in words, not bytes. */
-                    NULL,               /* Parameter passed into the task. */
-                    1,                  /* Priority at which the task is created. */
-                    NULL );             /* Used to pass out the created task's handle. */
+                    "unlock the lock",      /* Text name for the task. */
+                    1000,                   /* Stack size in words, not bytes. */
+                    NULL,                   /* Parameter passed into the task. */
+                    1,                      /* Priority at which the task is created. */
+                    NULL );                 /* Used to pass out the created task's handle. */
 }
 
 
