@@ -276,7 +276,7 @@ static esp_err_t i2c_master_sensor_test()
     t19_compass_read_xyz(&_x, &_y, &_z);
     
     // printf("data %d %d %d\n", _x, _y, _z);
-    int num_avg = 50;
+    int num_avg = 20;
     int heading;
 
     while (1) {
@@ -299,7 +299,7 @@ static esp_err_t i2c_master_sensor_test()
         z /= num_avg;
 
         heading = atan2(y, x) * 180 / M_PI;
-        printf("%d %d %d %d\n", x, y, z, heading);
+        printf("x:%d y:%d z:%d (uT) heading (deg):%d\n", x, y, z, heading);
         if (heading > 85 && heading < 105) {
             gpio_set_level(BLINK_GPIO, 1);
         } else {
