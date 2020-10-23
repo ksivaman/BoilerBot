@@ -218,6 +218,7 @@ u_result grabData(_u32 timeout, uint8_t * _currentMeasurement) {
 
     int size = uart_read_bytes(UART_NUM_1, _currentMeasurement, SIZEREAD, timeout * 1000 / portTICK_RATE_MS);
     if (size != SIZEREAD) {
+        printf("here");
         return RESULT_OPERATION_TIMEOUT;
     } else {
         for (i = 0; i < NUMPOINTS; i++) {
@@ -410,4 +411,3 @@ u_result _waitResponseHeader(rplidar_ans_header_t * header, _u32 timeout)
 
     return RESULT_OPERATION_TIMEOUT;
 }
-

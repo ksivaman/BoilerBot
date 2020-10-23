@@ -126,5 +126,3 @@ u_result grabData(_u32 timeout, uint8_t * buff);
 //     HardwareSerial * _bined_serialdev;  
     // RPLidarMeasurement _currentMeasurement;
 // };
-
-

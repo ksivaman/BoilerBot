@@ -1,7 +1,5 @@
 /* UART asynchronous example, that uses separate RX and TX tasks
-
    This example code is in the Public Domain (or CC0 licensed, at your option.)
-
    Unless required by applicable law or agreed to in writing, this
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +13,7 @@
 #include "driver/gpio.h"
 #include "RPLIdar_c.h"
 #include "driver/ledc.h"
+#include "AnalyzeLiDAR.h"
 
 #ifdef CONFIG_IDF_TARGET_ESP32
 #define LEDC_HS_TIMER          LEDC_TIMER_0
@@ -24,6 +23,7 @@
 #endif
 
 static const int RX_BUF_SIZE = 1024;
+static const short NUM_SAMPLES = 400;
 
 #define TXD_PIN (GPIO_NUM_10)
 #define RXD_PIN (GPIO_NUM_9)
@@ -115,14 +115,13 @@ void app_main(void)
     vTaskDelay(4000 / portTICK_PERIOD_MS);
     printf("Init done, Turning on the Motor\n");
 
-    uint8_t* buff = (uint8_t*) malloc(sizeof(rplidar_response_measurement_node_t) * 400);
+    uint8_t* buff = (uint8_t*) malloc(sizeof(rplidar_response_measurement_node_t) * NUM_SAMPLES);
     rplidar_response_measurement_node_t * node = (rplidar_response_measurement_node_t*)(buff);
 
     // struct _rplidar_response_measurement_node_t node[100];
     RPLidarMeasurement _currentMeasurement;
     int count = 0;
     int i;
-    printf("hello??");
 
     ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, 0);
     ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
@@ -130,6 +129,8 @@ void app_main(void)
     // try to detect RPLIDAR...
     vTaskDelay(1000 / portTICK_PERIOD_MS); 
 
+    stop();
+    vTaskDelay(1000 / portTICK_PERIOD_MS); 
     startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
     
     // start motor rotating at max allowed speed
@@ -143,23 +144,44 @@ void app_main(void)
     float angle = 0;
     float prevAngle = angle;
 
-    if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
-    // if (IS_OK(waitPoint(RPLIDAR_DEFAULT_TIMEOUT, & _currentMeasurement))) {
-        // printf("Distance: %f, Angle: %f\n", _currentMeasurement.distance, _currentMeasurement.angle);
+    // if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
+    // // if (IS_OK(waitPoint(RPLIDAR_DEFAULT_TIMEOUT, & _currentMeasurement))) {
+    //     // printf("Distance: %f, Angle: %f\n", _currentMeasurement.distance, _currentMeasurement.angle);
         
-        
-        for (i = 0; i < 400; i++) {
-            prevAngle = angle;
-            angle = (node[i].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f;
-            printf("Distance: %f, Angle: %f", node[i].distance_q2/4.0f, (node[i].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f);
-            // printf(",  Quality: %d", node[i].sync_quality >> 2);
-            printf(" --- diff is %f\n", angle - prevAngle);
+    //     for (i = 0; i < 400; i++) {
+    //         prevAngle = angle;
+    //         angle = (node[i].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f;
+    //         printf("Distance: %f, Angle: %f", node[i].distance_q2/4.0f, (node[i].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f);
+    //         // printf(",  Quality: %d", node[i].sync_quality >> 2);
+    //         printf(" --- diff is %f\n", angle - prevAngle);
+    //     }
+    // }
+
+    // Read 4 initialization scans
+    float* surrScans[4];
+    printf("Starting scanning...\n");
+    for(char i = 0; i < 4; i++) {
+        if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
+            printf("\n\nSurrounding Scan #%d:\n", i+1);
+            surrScans[(int)i] = quantizeScan(node, NUM_SAMPLES);
         }
+
+        printf("Done scanning. Waiting 15 seconds for new location...\n");
+        vTaskDelay(15000 / portTICK_PERIOD_MS);
     }
+
+    // Read current scan and determine which of the surrounding squares the bot is in 
+    printf("Determining location...\n");
+    if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
+        printf("\n\nCurrent Location Scan:\n");
+        char currLoc = decideLoc(node, NUM_SAMPLES, surrScans, 4);
+        printf("Bot is in square %d\n", currLoc);
+    }
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     // printf("\n\nTry waiting\n\n");
     // vTaskDelay(3000 / portTICK_PERIOD_MS); 
-    printf("\nnewData\n");
+    //printf("\nnewData\n");
 
     // if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
     // // if (IS_OK(waitPoint(RPLIDAR_DEFAULT_TIMEOUT, & _currentMeasurement))) {
@@ -174,9 +196,9 @@ void app_main(void)
     //     }
     // }
 
-    while(duty < 4000) {
-        vTaskDelay(1000 / portTICK_PERIOD_MS); 
-        float sum = 0;
+    // while(duty < 4000) {
+        // vTaskDelay(1000 / portTICK_PERIOD_MS); 
+        // float sum = 0;
         // if (IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))) {
         // // if (IS_OK(waitPoint(RPLIDAR_DEFAULT_TIMEOUT, & _currentMeasurement))) {
         //     // printf("Distance: %f, Angle: %f\n", _currentMeasurement.distance, _currentMeasurement.angle);
@@ -222,7 +244,6 @@ void app_main(void)
 
         /* Original testing code
         uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
-
         // Send START SCAN
         data[0] = 0xA5;
         data[1] = 0x20;
@@ -246,7 +267,6 @@ void app_main(void)
         printf("waiting\n");
         vTaskDelay(4000 / portTICK_PERIOD_MS);
         printf("waiting Done\n");
-
         // Send STOP
         data[0] = 0xA5;
         data[1] = 0x25;
@@ -261,7 +281,7 @@ void app_main(void)
         data[rxBytes] = '\0';
         vTaskDelay(4000 / portTICK_PERIOD_MS);
         */
-    }
+    //}
     
     // xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
     // xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
