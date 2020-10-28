@@ -141,8 +141,8 @@ void burst_rover(rover robot, int mm, enum dir direction) {
         motor_stop(robot);
     }
 
-    float time = 30* mm + 280;
-    // float time = 1010;
+    // float time = 30* mm + 280;
+    float time = 27.765 * mm + 390;
 
     ledc_set_duty(channel.speed_mode, channel.channel, MM_PER_SEC);
     ledc_update_duty(channel.speed_mode, channel.channel);
@@ -172,6 +172,20 @@ void burst_rover(rover robot, int mm, enum dir direction) {
 
 void turn_rover(rover robot, int degree, enum dir direction) {
     ledc_channel_config_t channel = robot.pwm;
+    // float heading = getHeading();
+
+    // int iteration;
+
+    // while (abs(desired dir - getHeading()) > 15){
+    //     time to turn = iteration
+    //     if (<) {
+    //         turn left a little
+    //     }
+    //     else {
+    //         turn right a little
+    //     }
+    //     iteration /= 2;
+    // }
 
     if (direction == RIGHT) {
         motor_right(robot);
@@ -181,14 +195,7 @@ void turn_rover(rover robot, int degree, enum dir direction) {
         motor_stop(robot);
     }
 
-    // float time =  1390;
-    // float time = 14.444 * degree + 100; // for outside floor with Degree_per_sec_2
-    // float time = 14.444 * degree + 110; // for bathroom floor with Degree_per_sec_2
-    // float time = 605; // for room (carpet) floor with Degree_per_sec_1
-
-    // float time = 13.778 * degree + 160; // for outside florr with _SLOW
-    // float time = 11.889 * degree + 70; // for outside floor with _FAST
-    float time = 810;
+    float time = 10.889 * degree + 60;
 
     ledc_set_duty(channel.speed_mode, channel.channel, DEGREE_PER_SEC_SLOW);
     ledc_update_duty(channel.speed_mode, channel.channel);
@@ -288,7 +295,7 @@ void app_main(void)
     // burst_rover(robot1, 50, BACKWARD);
 
     printf("1. Forward burst = %d mm\n", 100);
-    turn_rover(robot1, 90, RIGHT);
+    turn_rover(robot1, 45, RIGHT);
 
     while (1) {
         
