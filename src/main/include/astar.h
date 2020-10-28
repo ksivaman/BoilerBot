@@ -45,7 +45,7 @@ void reversePath(Path ** to, Path * from);
 
 //floorplan data structure
 int fplan[NROWS][NCOLS] = {
-	{1,1,1,1,0,0,1},
+	{1,1,1,1,0,0,0},
 	{0,0,0,1,0,0,1},
 	{1,0,0,1,0,0,1},
 	{1,0,0,0,0,0,0},

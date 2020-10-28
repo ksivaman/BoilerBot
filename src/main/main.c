@@ -18,6 +18,7 @@
 #include "include/wifi_login.h"
 #include "astar.c"
 #include "compass.c"
+#include "include/lidar_data.h"
 
 #define LOCK_GPIO 4
 
