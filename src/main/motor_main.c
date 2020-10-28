@@ -50,6 +50,12 @@
 #define GPIO_OUTPUT_IN_4    (18)
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IN_1) | (1ULL<<GPIO_OUTPUT_IN_2) | (1ULL<<GPIO_OUTPUT_IN_3) | (1ULL<<GPIO_OUTPUT_IN_4))
 
+#define MM_PER_SEC (768)
+#define DEGREE_PER_SEC_FAST (3072) //(4096)
+#define DEGREE_PER_SEC_SLOW (2560)
+#define DEGREE_PER_SEC_2 (2048) //(3584)
+
+
 enum dir{FORWARD, BACKWARD, RIGHT, LEFT, STOP};
 
 typedef struct {
@@ -120,6 +126,81 @@ void rover_run(rover robot, int speed, enum dir direction, bool acc) {
 
 }
 
+void break_rover(rover robot, enum dir direction) {
+
+}
+
+void burst_rover(rover robot, int mm, enum dir direction) {
+    ledc_channel_config_t channel = robot.pwm;
+
+    if (direction == FORWARD) {
+        motor_forward(robot);
+    } else if (direction == BACKWARD) {
+        motor_backward(robot);
+    } else {
+        motor_stop(robot);
+    }
+
+    float time = 30* mm + 280;
+    // float time = 1010;
+
+    ledc_set_duty(channel.speed_mode, channel.channel, MM_PER_SEC);
+    ledc_update_duty(channel.speed_mode, channel.channel);
+
+    vTaskDelay(time / portTICK_PERIOD_MS);
+    
+    //break
+    motor_stop(robot);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
+    if (direction == FORWARD) {  
+        motor_backward(robot);
+    } else if (direction == BACKWARD) {
+        motor_forward(robot);
+    } else {
+        motor_stop(robot);
+    }
+
+    ledc_set_duty(channel.speed_mode, channel.channel, 512);
+    ledc_update_duty(channel.speed_mode, channel.channel);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    motor_stop(robot);
+    ledc_set_duty(channel.speed_mode, channel.channel, 0);
+    ledc_update_duty(channel.speed_mode, channel.channel);
+    
+}
+
+void turn_rover(rover robot, int degree, enum dir direction) {
+    ledc_channel_config_t channel = robot.pwm;
+
+    if (direction == RIGHT) {
+        motor_right(robot);
+    } else if (direction == LEFT) {
+        motor_left(robot);
+    } else {
+        motor_stop(robot);
+    }
+
+    // float time =  1390;
+    // float time = 14.444 * degree + 100; // for outside floor with Degree_per_sec_2
+    // float time = 14.444 * degree + 110; // for bathroom floor with Degree_per_sec_2
+    // float time = 605; // for room (carpet) floor with Degree_per_sec_1
+
+    // float time = 13.778 * degree + 160; // for outside florr with _SLOW
+    // float time = 11.889 * degree + 70; // for outside floor with _FAST
+    float time = 810;
+
+    ledc_set_duty(channel.speed_mode, channel.channel, DEGREE_PER_SEC_SLOW);
+    ledc_update_duty(channel.speed_mode, channel.channel);
+
+    vTaskDelay(time / portTICK_PERIOD_MS);
+    motor_stop(robot);
+
+    ledc_set_duty(channel.speed_mode, channel.channel, 0);
+    ledc_update_duty(channel.speed_mode, channel.channel);
+
+}
+
 
 void app_main(void)
 {
@@ -182,40 +263,70 @@ void app_main(void)
     robot1.motor_3 = GPIO_OUTPUT_IN_3;
     robot1.motor_4 = GPIO_OUTPUT_IN_4;
 
+
+    // printf("1. Forward burst = %d mm\n", 100);
+    // burst_rover(robot1, 100, FORWARD);
+
+    // vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    // printf("1. Backward burst = %d mm\n", 75);
+    // burst_rover(robot1, 75, BACKWARD);
+
+    // vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    // printf("1. Forward burst = %d mm\n", 50);
+    // burst_rover(robot1, 50, FORWARD);
+
+    // vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    // printf("1. Backward burst = %d mm\n", 25);
+    // burst_rover(robot1, 25, BACKWARD);
+
+    // vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    // printf("1. Backward burst = %d mm\n", 50);
+    // burst_rover(robot1, 50, BACKWARD);
+
+    printf("1. Forward burst = %d mm\n", 100);
+    turn_rover(robot1, 90, RIGHT);
+
     while (1) {
         
-        printf("1. Forward accelerate up to duty = %d\n", LEDC_TEST_DUTY);
-        rover_run(robot1, LEDC_TEST_DUTY, FORWARD, true); 
-        vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
-
-        printf("2. Forward decclerate down to duty = 0\n");
-        rover_run(robot1, 0, FORWARD, true); 
-        vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+        vTaskDelay(10 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
         
-        printf("3. Backword accelerate up to duty = %d\n", LEDC_TEST_DUTY);
-        rover_run(robot1, LEDC_TEST_DUTY, BACKWARD, true); 
-        vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
-
-        printf("4. Stop immediately\n");
-        rover_run(robot1, 0, STOP, false);
-        vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
-
-        printf("5. turn right\n");
-        rover_run(robot1, LEDC_TEST_DUTY, RIGHT, false);
-        vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
-
-        printf("6. Stop immediately\n");
-        rover_run(robot1, 0, STOP, false);
-        vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
-
-        printf("7. turn left\n");
-        rover_run(robot1, LEDC_TEST_DUTY, LEFT, false);
-        vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+        // printf("1. Forward burst = %d mm\n", 100);
+        // burst_rover(robot1, 100,FORWARD);
+        // rover_run(robot1, LEDC_TEST_DUTY, FORWARD, true); 
         
-        // stops
-        printf("8. Done!\n");
-        rover_run(robot1, 0, STOP, false);
-        vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+
+        // printf("2. Forward decclerate down to duty = 0\n");
+        // rover_run(robot1, 0, FORWARD, true); 
+        // vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+        
+        // printf("3. Backword accelerate up to duty = %d\n", LEDC_TEST_DUTY);
+        // rover_run(robot1, LEDC_TEST_DUTY, BACKWARD, true); 
+        // vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+
+        // printf("4. Stop immediately\n");
+        // rover_run(robot1, 0, STOP, false);
+        // vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+
+        // printf("5. turn right\n");
+        // rover_run(robot1, LEDC_TEST_DUTY, RIGHT, false);
+        // vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+
+        // printf("6. Stop immediately\n");
+        // rover_run(robot1, 0, STOP, false);
+        // vTaskDelay(2 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+
+        // printf("7. turn left\n");
+        // rover_run(robot1, LEDC_TEST_DUTY, LEFT, false);
+        // vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
+        
+        // // stops
+        // printf("8. Done!\n");
+        // rover_run(robot1, 0, STOP, false);
+        // vTaskDelay(3 * LEDC_TEST_FADE_TIME / portTICK_PERIOD_MS);
 
     }
 }
