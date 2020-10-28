@@ -2,6 +2,9 @@
 #include <stdlib.h> 
 #include <stdbool.h>
 
+#define NROWS 7
+#define NCOLS 7
+
 typedef struct point { //data structure representing 1 coordinate
     int x;
     int y;
@@ -40,23 +43,14 @@ void freePaths(Path *** paths, int numRows, int numCols);
 void freePath(Path *path);
 void reversePath(Path ** to, Path * from);
 
-
 //floorplan data structure
-#define NROWS 12
-#define NCOLS 12
-
 int fplan[NROWS][NCOLS] = {
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{1,1,1,1,1,1,1,1,1,1,1,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,1,1,1,1,1,1,1,1,1,1,1},
-	{0,1,1,1,1,1,1,1,1,1,1,1},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0}
+	{1,1,1,1,0,0,1},
+	{0,0,0,1,0,0,1},
+	{1,0,0,1,0,0,1},
+	{1,0,0,0,0,0,0},
+	{1,1,1,0,1,0,1},
+	{1,1,1,0,1,0,1},
+	{1,1,1,0,0,0,1}
 };
 
