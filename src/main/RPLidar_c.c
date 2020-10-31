@@ -27,7 +27,7 @@
  *
  */
 
-#include "RPLidar_c.h"
+#include "include/RPLidar_c.h"
 #include <time.h>
 #include "esp_timer.h"
 
