@@ -3,8 +3,98 @@
 #include <limits.h>
 #include <math.h>
 #include "include/rplidar_cmd.h"
-#include "include/RPLidar_c.h"
+#include "RPLidar_c.c"
 #include "include/AnalyzeLiDAR.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
+#include "driver/uart.h"
+#include "string.h"
+#include "driver/gpio.h"
+#include "driver/ledc.h"
+#include "include/astar.h"
+#include "include/lidar_data.h"
+
+
+#ifdef CONFIG_IDF_TARGET_ESP32
+#define LEDC_HS_TIMER          LEDC_TIMER_0
+#define LEDC_HS_MODE           LEDC_HIGH_SPEED_MODE
+#define LEDC_HS_CH0_GPIO       (5)
+#define LEDC_HS_CH0_CHANNEL    LEDC_CHANNEL_0
+#endif
+
+static const int RX_BUF_SIZE = 1024;
+
+#define TXD_PIN (GPIO_NUM_10)
+#define RXD_PIN (GPIO_NUM_9)
+
+//global variables for lidar stuff
+uint8_t* buff = NULL;
+rplidar_response_measurement_node_t * node = NULL;
+
+void init_lidar(void) {
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    buff = (uint8_t*) malloc(sizeof(rplidar_response_measurement_node_t) * NUM_SAMPLES);
+    node = (rplidar_response_measurement_node_t*)(buff);
+
+    ledc_timer_config_t ledc_timer = {
+        .duty_resolution = LEDC_TIMER_12_BIT, // resolution of PWM duty
+        .freq_hz = 10000,                     // frequency of PWM signal
+        .speed_mode = LEDC_HS_MODE,           // timer mode
+        .timer_num = LEDC_HS_TIMER,            // timer index
+        .clk_cfg = LEDC_AUTO_CLK,              // Auto select the source clock
+    };
+
+    ledc_timer_config(&ledc_timer);
+
+    ledc_channel_config_t ledc_channel = 
+        {
+            .channel    = LEDC_HS_CH0_CHANNEL,
+            .duty       = 0,
+            .gpio_num   = LEDC_HS_CH0_GPIO,
+            .speed_mode = LEDC_HS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_HS_TIMER
+        };
+    
+    // // Set LED Controller with previously prepared configuration
+    ledc_channel_config(&ledc_channel);
+
+    // Initialize fade service.
+    ledc_fade_func_install(0);
+    vTaskDelay(4000 / portTICK_PERIOD_MS);
+
+    ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, 0);
+    ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
+    
+    // try to detect RPLIDAR...
+    vTaskDelay(1000 / portTICK_PERIOD_MS); 
+
+    // stop();
+    vTaskDelay(1000 / portTICK_PERIOD_MS); 
+    // startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
+    
+    // start motor rotating at max allowed speed
+    int duty = 1270;
+    ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, duty);
+    ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
+    vTaskDelay(9000 / portTICK_PERIOD_MS); 
+
+}
 
 static int comp (const void *a, const void *b){
     return ((pp*)a)->angle - ((pp*)b)->angle;
@@ -55,16 +145,21 @@ float* quantizeScan(rplidar_response_measurement_node_t* scanSamples, short numS
 }
 
 // Determine current location by comparing current quantized scan with the quantized initialization scans
-char getCurrLoc(rplidar_response_measurement_node_t* scanSamples, short numSamples, int fplan[NROWS][NCOLS], float initScans[NROWS][NCOLS][FINAL_NUM_POINTS], char numInitScans) {    
-    // Quantize current scan
-    float* procScanSamp = quantizeScan(scanSamples, numSamples);
+Point getCurrLoc() {    
+    //get lidar scan data (unprocessed)
+    startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
+    while(!(IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))));
+    stop();
+
+    // Quantize current scan (processing)
+    float* procScanSamp = quantizeScan(node, NUM_SAMPLES);
 
     // Stats for initialization scan best match
     int minDiff = INT_MAX;
     char bestMatchID = 0;
     
     // For each square in floor plan
-    for(int initScanID = 0; initScanID < numInitScans; initScanID++) {
+    for(int initScanID = 0; initScanID < SQUARES_IN_MAP; initScanID++) {
         // Skip invalid squares in floor plan
         if(fplan[initScanID / NCOLS][initScanID % NCOLS] == 1) {
             printf("Skipping Obstacle Square (%d, %d)\n", initScanID / NCOLS, initScanID % NCOLS);
@@ -81,7 +176,7 @@ char getCurrLoc(rplidar_response_measurement_node_t* scanSamples, short numSampl
             int diff = 0;
             // Inner for loop: Compare 360 samples in angle-aligned current scan with those in initialization scan
             for(int i = 0; i < FINAL_NUM_POINTS; i++) {
-                diff += pow(abs(procScanSamp[(zeroDegIdx + i) % FINAL_NUM_POINTS] - initScans[initScanID / NCOLS][initScanID % NCOLS][i]), 1);
+                diff += pow(abs(procScanSamp[(zeroDegIdx + i) % FINAL_NUM_POINTS] - lidar_data[initScanID / NCOLS][initScanID % NCOLS][i]), 1);
             }
             if(diff < minDiffForCurrInitScan) {
                 minDiffForCurrInitScan = diff;
@@ -96,5 +191,8 @@ char getCurrLoc(rplidar_response_measurement_node_t* scanSamples, short numSampl
 
     }
     
-    return bestMatchID;
+    Point ret;
+    ret.x = (int) bestMatchID / NROWS;
+    ret.y = (int) bestMatchID % NCOLS;
+    return ret;
 }

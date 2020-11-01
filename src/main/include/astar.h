@@ -1,9 +1,10 @@
+#ifndef __ASTAR_H__
+#define __ASTAR_H__
+
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <stdbool.h>
-
-#define NROWS 7
-#define NCOLS 7
+#include "constants.h"
 
 typedef struct point { //data structure representing 1 coordinate
     int x;
@@ -54,3 +55,6 @@ int fplan[NROWS][NCOLS] = {
 	{1,1,1,0,0,0,1}
 };
 
+
+
+#endif

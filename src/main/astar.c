@@ -1,5 +1,4 @@
 #include "include/astar.h"
-// #include "bmpfunc.h"
 
 
 Path* getPathAStar(int numRows, int numCols, int grid[][numCols], Point start, Point end) {

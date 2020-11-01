@@ -64,6 +64,10 @@ typedef struct {
     gpio_num_t motor_2;
     gpio_num_t motor_3;
     gpio_num_t motor_4;
+    float before_burst_f;
+    float before_burst_b;
+    int currAngle;
+    Point prevLoc;
 } rover;
 
 void motor_forward(rover robot) {
@@ -147,9 +151,11 @@ void burst_rover(rover robot, int mm, enum dir direction) {
     ledc_set_duty(channel.speed_mode, channel.channel, MM_PER_SEC);
     ledc_update_duty(channel.speed_mode, channel.channel);
 
+    // while (time)
+
     vTaskDelay(time / portTICK_PERIOD_MS);
     
-    //break
+    //////////////////////////////break
     motor_stop(robot);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     
@@ -167,6 +173,7 @@ void burst_rover(rover robot, int mm, enum dir direction) {
     motor_stop(robot);
     ledc_set_duty(channel.speed_mode, channel.channel, 0);
     ledc_update_duty(channel.speed_mode, channel.channel);
+    /////////////////////////////
     
 }
 

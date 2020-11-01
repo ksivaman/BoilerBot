@@ -17,10 +17,9 @@
 #include "esp_http_client.h"
 #include "include/wifi_login.h"
 #include "astar.c"
-#include "compass.c"
+#include "include/constants.h"
 #include "include/lidar_data.h"
-
-#define LOCK_GPIO 4
+#include "AnalyzeLiDAR.c"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -130,6 +129,29 @@ void getRequest(char* buf, Point * start, Point * end) {
     end->y = (buf[9] - 48) * 10 + (buf[10] - 48);
 }
 
+int post_url_content(const char url[], char buf[], int length) {
+    esp_err_t err;
+    // Add correct website domain later
+    esp_http_client_config_t config = {
+        .url = url,
+        .method = HTTP_METHOD_PUT,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if ((err = esp_http_client_open(client, 1024)) != ESP_OK){
+        printf("Error opening client connection\n");
+    }
+    // esp_http_client_set_header(client, "Content-Type", "application/json");
+
+    int write_bytes;
+    write_bytes = esp_http_client_write(client, buf, length);
+
+    //cleanup
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    return write_bytes;
+}
+
 int get_url_content(const char url[], char buf[], int length) {
     esp_err_t err;
     // Add correct website domain later
@@ -157,6 +179,13 @@ int get_url_content(const char url[], char buf[], int length) {
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
     return read_bytes;
+}
+
+void prints(char * p) {
+    char buf[1024];
+    char empty[10];
+    snprintf(buf, 1024, "http://boilerbot-289518.uc.r.appspot.com/admin/print?text=%s", p);
+    int w = get_url_content(buf, empty, 0);
 }
 
 void unlock(){
@@ -215,6 +244,14 @@ void app_main(void) {
     // Check if not connected, and keep trying again and again
     wifi_init_sta();
     printf("__________ Initialized wifi!\n");
+
+    //Initialize LiDAR stuff
+    init_lidar();
+    curr = getCurrLoc();
+    char lo[6];
+    snprintf(lo, 6, "(%d,%d)", curr.x, curr.y);
+    prints(lo);
+    if (1) {return;}
 
     // Wait till there is a request
     printf("__________ Waiting for new delivery request...\n");
