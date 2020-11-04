@@ -20,6 +20,8 @@
 #include "include/constants.h"
 #include "include/lidar_data.h"
 #include "AnalyzeLiDAR.c"
+#include "esp_timer.h"
+#include "motor_main.c"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -185,7 +187,7 @@ void prints(char * p) {
     char buf[1024];
     char empty[10];
     snprintf(buf, 1024, "http://boilerbot-289518.uc.r.appspot.com/admin/print?text=%s", p);
-    int w = get_url_content(buf, empty, 0);
+    get_url_content(buf, empty, 0);
 }
 
 void unlock(){
@@ -199,10 +201,9 @@ void unlock(){
 }
 
 void create_unlock_task(void) {
-    BaseType_t xReturned;
 
     /* Create the task, storing the handle. */
-    xReturned = xTaskCreate(
+    xTaskCreate(
                     unlock,                 /* Function that implements the task. */
                     "unlock the lock",      /* Text name for the task. */
                     1000,                   /* Stack size in words, not bytes. */
@@ -219,6 +220,7 @@ void app_main(void) {
     start.x = 0; start.y = 0; end.x = 0; end.y = 0;
     curr.x = 2; curr.y = 1;
     char buf[1024];
+    char lo[100]; //debug print buffer
 
     printf("__________ Wassup. Im here. Back at work. Lets go...\n");
 
@@ -245,12 +247,88 @@ void app_main(void) {
     wifi_init_sta();
     printf("__________ Initialized wifi!\n");
 
+
+
+    ///// ROVER INITIALIZE
+    gpio_config_t io_conf;
+    io_conf.intr_type = GPIO_PIN_INTR_DISABLE; //disable interrupt
+    io_conf.mode = GPIO_MODE_OUTPUT; //set as output mode
+    io_conf.pin_bit_mask = GPIO_OUTPUT_PIN_SEL; //bit mask of the pins that you want to set,e.g.GPIO 18-19, 22-23
+    io_conf.pull_down_en = 1; //enable pull-down mode
+    io_conf.pull_up_en = 0; //disable pull-up mode
+    gpio_config(&io_conf); //configure GPIO with the given settings
+    
+
+    /*
+     * Prepare and set configuration of timers
+     * that will be used by LED Controller
+     */
+    ledc_timer_config_t ledc_timer = {
+        .duty_resolution = LEDC_TIMER_12_BIT, // resolution of PWM duty
+        .freq_hz = 10000,                     // frequency of PWM signal
+        .speed_mode = LEDC_HS_MODE,           // timer mode
+        .timer_num = LEDC_TIMER_1,            // timer index
+        .clk_cfg = LEDC_AUTO_CLK,              // Auto select the source clock
+    };
+    // // Set configuration of timer0 for high speed channels
+    ledc_timer_config(&ledc_timer);
+
+    /*
+     * Prepare individual configuration
+     * for each channel of LED Controller
+     * by selecting:
+     * - controller's channel number
+     * - output duty cycle, set initially to 0
+     * - GPIO number where LED is connected to
+     * - speed mode, either high or low
+     * - timer servicing selected channel
+     *   Note: if different channels use one timer,
+     *         then frequency and bit_num of these channels
+     *         will be the same
+     */
+    ledc_channel_config_t ledc_channel = 
+    {
+        .channel    = LEDC_CHANNEL_1,
+        .duty       = 0,
+        .gpio_num   = 21,
+        .speed_mode = LEDC_HS_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER_1
+    };
+    
+    // // Set LED Controller with previously prepared configuration
+    ledc_channel_config(&ledc_channel);
+
+    // Initialize fade service.
+    ledc_fade_func_install(0);
+
+    rover robot1 = {
+        .pwm = ledc_channel,
+        .motor_1 = GPIO_OUTPUT_IN_1,
+        .motor_2 = GPIO_OUTPUT_IN_2,
+        .motor_3 = GPIO_OUTPUT_IN_3,
+        .motor_4 = GPIO_OUTPUT_IN_4,
+        .heading = NORTH,
+        {
+            .x = 0,
+            .y = 0
+        },
+    };
+
     //Initialize LiDAR stuff
     init_lidar();
-    curr = getCurrLoc();
-    char lo[6];
-    snprintf(lo, 6, "(%d,%d)", curr.x, curr.y);
+    // Point secondClose = {-1, -1};
+    // int angle;
+
+    bool obstacle;
+    float moved = burst_rover(robot1, 114, NORTH, &obstacle);
+    // burst_rover(robot1, 85, FORWARD);
+    snprintf(lo, 114, "moved_%f___obstacle_%d", moved, obstacle);
     prints(lo);
+
+    curr = getCurrLoc();
+
+
     if (1) {return;}
 
     // Wait till there is a request

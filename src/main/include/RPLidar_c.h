@@ -64,7 +64,7 @@ u_result stop();
 
 u_result startScan(bool force, _u32 timeout); // default: force = false, timeout = RPLIDAR_DEFAULT_TIMEOUT*2
 
-u_result waitPoint(_u32 timeout, RPLidarMeasurement * _currentMeasurement); // default: timeout = RPLIDAR_DEFAULT_TIMEOUT
+// u_result waitPoint(_u32 timeout, RPLidarMeasurement * _currentMeasurement); // default: timeout = RPLIDAR_DEFAULT_TIMEOUT
 
 // void getCurrentPoint();
 

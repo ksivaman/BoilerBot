@@ -213,7 +213,7 @@ u_result grabData(_u32 timeout, uint8_t * _currentMeasurement) {
 
     // _u8 *nodebuf = (_u8*)(_currentMeasurement);
 
-    uint8_t currentbyte[SIZEREAD]; // sizeof(rplidar_response_measurement_node_t)
+    // uint8_t currentbyte[SIZEREAD]; // sizeof(rplidar_response_measurement_node_t)
 
 
     int size = uart_read_bytes(UART_NUM_1, _currentMeasurement, SIZEREAD, timeout * 1000 / portTICK_RATE_MS);
@@ -249,70 +249,6 @@ u_result grabData(_u32 timeout, uint8_t * _currentMeasurement) {
     }
     return RESULT_OK;
 }
-
-
-u_result waitPoint(_u32 timeout, RPLidarMeasurement * _currentMeasurement)
-{
-//    _u32 currentTs = millis();
-    int64_t  currentTs = esp_timer_get_time();
-    int64_t remainingtime;
-    rplidar_response_measurement_node_t node;
-    _u8 *nodebuf = (_u8*)&node;
-
-    _u8 recvPos = 0;
-
-    uint8_t currentbyte[5]; // sizeof(rplidar_response_measurement_node_t)
-
-    while ((remainingtime=esp_timer_get_time() - currentTs) <= timeout * 1000) {
-        // int currentbyte = _bined_serialdev->read(); //uart read (one byte)
-        
-        int size = uart_read_bytes(UART_NUM_1, &currentbyte, 5, 1000 / portTICK_RATE_MS);
-        if (size != 5) {
-            continue;
-        } else {
-            while (recvPos < 5) {
-                switch (recvPos) {
-                    case 0: // expect the sync bit and its reverse in this byte          {
-                        {
-                            _u8 tmp = (currentbyte[recvPos]>>1);
-                            if ( (tmp ^ currentbyte[recvPos]) & 0x1 ) {   // just checking if last 2 bits are opposite
-                                // pass, we are goood
-                            } else {
-                                continue;
-                            }
-
-                        }
-                        break;
-                    case 1: // expect the highest bit to be 1
-                        {
-                            if (currentbyte[recvPos] & RPLIDAR_RESP_MEASUREMENT_CHECKBIT) { // check sum should be 1
-                                // pass, we are good
-                            } else {
-                                recvPos = 0;
-                                continue;
-                            }
-                        }
-                        break;
-                }
-                nodebuf[recvPos] = currentbyte[recvPos];
-                recvPos++;
-            }
-        }
-
-        if (recvPos == sizeof(rplidar_response_measurement_node_t)) {
-            // store the data ... // at global object
-            _currentMeasurement->distance = node.distance_q2/4.0f;
-            _currentMeasurement->angle = (node.angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f;
-            _currentMeasurement->quality = (node.sync_quality>>RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT);
-            _currentMeasurement->startBit = (node.sync_quality & RPLIDAR_RESP_MEASUREMENT_SYNCBIT);
-            return RESULT_OK;
-        }
-        
-   }
-
-   return RESULT_OPERATION_TIMEOUT;
-}
-
 
 // Sends request packet
 u_result _sendCommand(_u8 cmd, const void * payload, size_t payloadsize)
