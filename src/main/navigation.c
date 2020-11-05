@@ -1,4 +1,6 @@
-#include "astar.h"
+#include "include/astar.h"
+#include "include/AnalyzeLiDAR.h"
+#include "include/navigation.h"
 
 void navigate(Path* pathStart, enum compass* currHeading) {
     // Pointer to traverse through A* path
@@ -9,6 +11,7 @@ void navigate(Path* pathStart, enum compass* currHeading) {
         Path* burstStart = path;
 
         // TODO: Call Jin's turn function based on turnAngle
+        printf("__________ Turning %d degrees\n", turnAngle);
 
         // Find burst direction
         int changeXDir = path->next->data.x - path->data.x;
@@ -53,7 +56,7 @@ void navigate(Path* pathStart, enum compass* currHeading) {
         Point burstEndPoint = path->data;
 
         // Jin's approach
-        int burstDir;
+        // int burstDir;
         int burstLen;
         // If moving in X Direction
         if(changeXDir != 0) {
@@ -62,9 +65,11 @@ void navigate(Path* pathStart, enum compass* currHeading) {
         }
         // If moving in Y Direction
         else {
-            burstLen = abs(burstEndPoint.y - path_start->data.y);
+            burstLen = abs(burstEndPoint.y - burstStart->data.y);
             // burstDir = changeYDir > 0? WEST : EAST;
         }
+
+        printf("__________ Bursting %d blocks to (%d, %d)\n", burstLen, burstEndPoint.x, burstEndPoint.y);
 
         // TODO: burst(burstLen, burstEndPoint) // Pass in distance, and the final point. burst till you reach that point
 
@@ -109,8 +114,8 @@ int getTurnAngle(Path* path, enum compass* currHeading) {
         desiredAngle = 270;
     }
 
-    int currDir;
-    switch(*currHeading) {
+    int currDir = -1;
+    switch((*currHeading)) {
         case NORTH : currDir = 0;
                      break;
         case EAST:   currDir = 90;
@@ -146,32 +151,32 @@ int getTurnAngle(Path* path, enum compass* currHeading) {
 
 
 
-// OLD TURNING LOGIC
+// // OLD TURNING LOGIC
 
-// turnLeft == true: turn left          turnLeft == false: turn right
-bool turnLeft;
+// // turnLeft == true: turn left          turnLeft == false: turn right
+// bool turnLeft;
 
-// If burst was in Y direction
-if(changeYDir != 0) {
-    int newchangeDir = path->next->data.x - path->data.x;
-    // If burst was in +Y direction
-    if(changeYDir > 0) {
-        turnLeft = newchangeDir > 0? false : true;
-    }
-    // If burst was in -Y direction
-    else {
-        turnLeft = newchangeDir > 0? true : false;
-    }
-}
-// If burst was in X direction
-else {
-    int newchangeDir = path->next->data.y - path->data.y;
-    // If burst was in +X direction
-    if(changeXDir > 0) {
-        turnLeft = newchangeDir > 0? true : false;
-    }
-    // If burst was in -X direction
-    else {
-        turnLeft = newchangeDir > 0? false : true;
-    }
-}
+// // If burst was in Y direction
+// if(changeYDir != 0) {
+//     int newchangeDir = path->next->data.x - path->data.x;
+//     // If burst was in +Y direction
+//     if(changeYDir > 0) {
+//         turnLeft = newchangeDir > 0? false : true;
+//     }
+//     // If burst was in -Y direction
+//     else {
+//         turnLeft = newchangeDir > 0? true : false;
+//     }
+// }
+// // If burst was in X direction
+// else {
+//     int newchangeDir = path->next->data.y - path->data.y;
+//     // If burst was in +X direction
+//     if(changeXDir > 0) {
+//         turnLeft = newchangeDir > 0? true : false;
+//     }
+//     // If burst was in -X direction
+//     else {
+//         turnLeft = newchangeDir > 0? false : true;
+//     }
+// }
