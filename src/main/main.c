@@ -296,7 +296,6 @@ void app_main(void) {
     //     .timer_sel  = LEDC_TIMER_1
     // };
     
-<<<<<<< HEAD
     // // Set LED Controller with previously prepared configuration
     ledc_channel_config(&ledc_channel);
 
@@ -349,26 +348,6 @@ void app_main(void) {
     // burst_rover(robot1, 85, FORWARD);
     snprintf(lo, 114, "moved_%f___obstacle_%d", moved, obstacle);
     prints(lo);
-=======
-    // // // Set LED Controller with previously prepared configuration
-    // ledc_channel_config(&ledc_channel);
-
-    // // Initialize fade service.
-    // ledc_fade_func_install(0);
-
-    // rover robot1 = {
-    //     .pwm = ledc_channel,
-    //     .motor_1 = GPIO_OUTPUT_IN_1,
-    //     .motor_2 = GPIO_OUTPUT_IN_2,
-    //     .motor_3 = GPIO_OUTPUT_IN_3,
-    //     .motor_4 = GPIO_OUTPUT_IN_4,
-    //     .heading = NORTH,
-    //     {
-    //         .x = 0,
-    //         .y = 0
-    //     },
-    // };
->>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
 
     // //Initialize LiDAR stuff
     // init_lidar();
