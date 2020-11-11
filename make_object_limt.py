@@ -4,7 +4,7 @@ from math import atan2, pi, ceil, floor, cos, sin
 
 INFINIT = "__FLT_MAX__"
 
-FRONT_LIMIT = 320
+FRONT_LIMIT = 570 # 420
 SIDE_LIMIT = 240
 ROBOT_FRONT = 170
 NUM_ANGLE = 360
@@ -25,13 +25,26 @@ for i in range(NUM_ANGLE):
         limit[i] = str(round(abs(SIDE_LIMIT / sin(i / 180 * pi)), 2))
 
 limit_short = []
-for i in range(NUM_ANGLE):
+for i in range((NUM_ANGLE - end_angle), (NUM_ANGLE - front_angle)):
+    limit_short.append(str(round(abs(SIDE_LIMIT / sin(i / 180 * pi)), 2)))
+for i in range((NUM_ANGLE - front_angle), NUM_ANGLE):
+    limit_short.append(str(round(abs(FRONT_LIMIT / cos(i / 180 * pi)), 2)))
+for i in range(end_angle + 1):
     if i == 0:
         limit_short.append(str(FRONT_LIMIT))
     if (0 < i <= front_angle) or (NUM_ANGLE - front_angle <= i < NUM_ANGLE):
         limit_short.append(str(round(abs(FRONT_LIMIT / cos(i / 180 * pi)), 2)))
     if (front_angle < i <= end_angle) or (NUM_ANGLE-end_angle <= i < NUM_ANGLE - front_angle):
         limit_short.append(str(round(abs(SIDE_LIMIT / sin(i / 180 * pi)), 2)))
+
+# limit_short = []
+# for i in range(NUM_ANGLE):
+#     if i == 0:
+#         limit_short.append(str(FRONT_LIMIT))
+#     if (0 < i <= front_angle) or (NUM_ANGLE - front_angle <= i < NUM_ANGLE):
+#         limit_short.append(str(round(abs(FRONT_LIMIT / cos(i / 180 * pi)), 2)))
+#     if (front_angle < i <= end_angle) or (NUM_ANGLE-end_angle <= i < NUM_ANGLE - front_angle):
+#         limit_short.append(str(round(abs(SIDE_LIMIT / sin(i / 180 * pi)), 2)))
 
 object_range = len(limit_short)
 limit_short = "{" + ", ".join(limit_short) + "};"

@@ -1,3 +1,5 @@
+<<<<<<< HEAD
+=======
 Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
 Compiler: CMAKE_C_COMPILER-NOTFOUND 
 Build flags: 
@@ -140,5 +142,214 @@ Id flags: --ec++
 
 The output was:
 지정된 파일을 찾을 수 없습니다
+
+
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags:  
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -c 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -Aa 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -D__CLASSIC_C__ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags:  
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -c 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -Aa 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: CMAKE_C_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -D__CLASSIC_C__ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags:  
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -c 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: --c++ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: --ec++ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags:  
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: -c 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: --c++ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: CMAKE_CXX_COMPILER-NOTFOUND 
+Build flags: 
+Id flags: --ec++ 
+
+The output was:
+<<<<<<< HEAD
+지정된 파일을 찾을 수 없습니다
+=======
+The system cannot find the file specified
+>>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
 
 
