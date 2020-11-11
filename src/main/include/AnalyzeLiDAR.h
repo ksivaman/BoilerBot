@@ -27,9 +27,12 @@ void updateLiDARScan(float* prevScan);
 
 Point getCurrLoc();
 
+void getFrontBackDist(float * frontFinal, float *backFinal);
 float getFrontDist(float* procScanSamp);
 float getBackDist(float* procScanSamp);
-void doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int mm, bool* obstacleFlag, bool* distanceDoneFlag);
+bool doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int mm, bool* obstacleFlag, bool* distanceDoneFlag);
+bool isThereObstacle_s(float* procScanSamp, int tolerance);
+bool isThereObstacle_r(float* procScanSamp, int tolerance);
 int angleDiff(float* prevScan, float* newScan);
 int absoluteErrorFrom(float * procScanSamp, Point p, int * angle);
 Point get_curr_loc(int * angleReturn, Point * secondClose);

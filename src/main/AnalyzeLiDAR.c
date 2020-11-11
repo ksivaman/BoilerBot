@@ -78,7 +78,7 @@ void init_lidar(void) {
     ledc_channel_config(&ledc_channel);
 
     // Initialize fade service.
-    ledc_fade_func_install(0);
+    // ledc_fade_func_install(0);
     vTaskDelay(4000 / portTICK_PERIOD_MS);
 
     ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, 0);
@@ -95,7 +95,7 @@ void init_lidar(void) {
     int duty = 1270;
     ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, duty);
     ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
-    vTaskDelay(9000 / portTICK_PERIOD_MS); 
+    vTaskDelay(2000 / portTICK_PERIOD_MS); 
 
 }
 
@@ -132,8 +132,8 @@ void process(pp* input, int size, float* single_scan_data_proc){
         float minAngleDiff = __INT_MAX__;
         float minDist = __INT_MAX__;
         for (int j = 0; j < size; j++) {
-            if (abs(input[j].angle - i) < minAngleDiff) {
-                minAngleDiff = abs(input[j].angle - i);
+            if (fabs(input[j].angle - i) < minAngleDiff) {
+                minAngleDiff = fabs(input[j].angle - i);
                 minDist = input[j].distance;
             }
         }
@@ -142,49 +142,42 @@ void process(pp* input, int size, float* single_scan_data_proc){
     return;
 }
 
+// #define PROCESS_SEARCH_RANGE 6
 // (OPTIMIZED) Downsizes unquantized scan (400 samples) to quantized scan (360 samples)
 // void process(pp* input, int size, float* single_scan_data_proc){
-//     int searchRange = 6;
 //     float minAngleDiff = __INT_MAX__;
 //     float minDist = __INT_MAX__;
 //     int min_idx = 0;
 
-//     // Find first index
-//     for (int j = 0; j < searchRange; j++) {
-//         int diff = abs(input[j].angle - j);
+//     int i = 0;
+//     int s_idx = size - PROCESS_SEARCH_RANGE;
+//     while (i < PROCESS_SEARCH_RANGE * 2) {
+//         int idx = (s_idx + i) % size;
+//         float diff = (input[idx].angle > 180) ? (360 - input[idx].angle) : input[idx].angle;
 //         if (diff < minAngleDiff) {
 //             minAngleDiff = diff;
-//             minDist = input[j].distance;
-//             min_idx = j;
+//             minDist = input[idx].distance;
+//             min_idx = idx;
 //         }
+//         i++;
 //     }
-//     for (int j = size - searchRange - 1; j < size; j++) {
-//         int diff = abs(input[j].angle - j);
-//         if (diff < minAngleDiff) {
-//             minAngleDiff = diff;
-//             minDist = input[j].distance;
-//             min_idx = j;
-//         }
-//     }
-
 //     single_scan_data_proc[0] = minDist;
-    
+
 //     for (int i = 1; i < FINAL_NUM_POINTS; i++) {
 //         minAngleDiff = __INT_MAX__;
 //         minDist = __INT_MAX__;
-//         int k;
-//         int j = min_idx;
-//         int count = 0;
-
-//         while (count < searchRange) {
-//             k = (j + count % size);
-//             int diff = abs(input[k].angle - j);
+        
+//         int j = 0;
+//         s_idx = min_idx - 1;
+//         while (j < PROCESS_SEARCH_RANGE) {
+//             int idx = (s_idx + j) % size;
+//             int diff = fabs(input[idx].angle - i);
 //             if (diff < minAngleDiff) {
 //                 minAngleDiff = diff;
-//                 minDist = input[k].distance;
-//                 min_idx = k;
+//                 minDist = input[idx].distance;
+//                 min_idx = idx;
 //             }
-//             count++;
+//             j++;
 //         }
 //         single_scan_data_proc[i] = minDist;
 //     }
@@ -306,59 +299,202 @@ Point getCurrLoc() {
 
 float getDistHelper(float * proScanSamp, int refAngle) {
     float sum = 0;
-    int dev = 0;
+    int dev = 0, multiplier = 1;
+    float distance[FINAL_NUM_POINTS / 2] = {0};
+
+    if (90 < refAngle && refAngle < 270) {
+        multiplier = -1;
+    }
 
     float refDist = proScanSamp[refAngle];
-    int range = (int) (atan2(FRONT_SCAN_WIDTH / 2, refDist) * 180 / M_PI) + 0.5;
+    refDist = (refDist == 0) ? 900 : refDist;
+    int range = (atan2(FRONT_SCAN_WIDTH / 2, refDist) * 180 / M_PI) + 0.5;
+    // printf("refDist = %f, range = %d\n", refDist, range);
 
-    int j = 0;
-    int i = (FINAL_NUM_POINTS - (range/2) + refAngle) % FINAL_NUM_POINTS;
+    int j = 0, i = (FINAL_NUM_POINTS - (range/2) + refAngle) % FINAL_NUM_POINTS;
+    int angle = i;
+    float minDist = __FLT_MAX__, curr = 0;
     while (j < range) {
-        sum += cos((i + j) / 180.0 * M_PI) * proScanSamp[i + j];
-        dev++;
+        angle = (i + j) % 360;
+        if (proScanSamp[angle] > 10) {
+            curr = multiplier * cos(angle / 180.0 * M_PI) * proScanSamp[angle];
+            distance[j] = curr;
+            if (curr < minDist) {
+                minDist = curr;
+            }
+        } else {
+            distance[j] = 0;
+        }
         j++;
     }
-    return sum / dev; 
+
+    j = 0;
+    angle = i;
+    while (j < range) {
+        if (fabs(distance[j] - minDist) < 15) {
+            sum += distance[j];
+            dev++;
+        }
+        j++;
+    }
+
+    // int j = 0;
+    // int i = (FINAL_NUM_POINTS - (range/2) + refAngle) % FINAL_NUM_POINTS;
+    // int angle = i;
+    // while (j < range) {
+    //     angle = (i + j) % 360;
+    //     sum += cos(angle / 180.0 * M_PI) * proScanSamp[angle];
+    //     dev++;
+    //     j++;
+    // }
+    return round(sum / dev);
+}
+
+#define CONVERGENCE 15 //mm
+#define NUM_CONV 2
+void getFrontBackDist(float * frontFinal, float *backFinal) {
+    // int convergence = NUM_CONV;
+    int conv_front = NUM_CONV, conv_back = NUM_CONV;
+    float frontDev = 0, backDev = 0;
+    float origFront, front, newFront;
+    float origBack, back, newBack;
+
+    float * lidarScan = getLiDARScan();
+    origFront = front = getDistHelper(lidarScan, 0);
+    origBack = back = getDistHelper(lidarScan, 180);
+    updateLiDARScan(lidarScan);
+    newFront = getDistHelper(lidarScan, 0);
+    newBack = getDistHelper(lidarScan, 180);
+
+    int toggle = 1;
+
+    // printf("OrigFront: %f ?= newFront: %f\n", origFront, newFront);
+    // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
+    while (conv_front && conv_back) {
+        frontDev += toggle * (origFront - newFront);
+        backDev += toggle * (origBack - newBack);
+        if (frontDev < CONVERGENCE) conv_front--;
+        else {
+            conv_front = NUM_CONV;
+            origFront = newFront;
+            frontDev = 0;
+        }
+        if (backDev < CONVERGENCE) conv_back--;
+        else {
+            conv_back = NUM_CONV;
+            origBack = newBack;
+            backDev = 0;
+        }
+        front = newFront;
+        back = newBack;
+        updateLiDARScan(lidarScan);
+        newFront = getDistHelper(lidarScan, 0);
+        newBack = getDistHelper(lidarScan, 180);
+        // printf("OrigFront: %f ?= newFront: %f\n", origFront, newFront);
+        // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
+        
+        toggle = -1*toggle;
+    }
+
+    int one_more_chance = 2;
+    if (conv_back) {
+        while (one_more_chance--) {
+            toggle = -1*toggle;
+            backDev += toggle * (origBack - newBack);
+            if (backDev < CONVERGENCE) conv_back--;
+            else {
+                conv_back = NUM_CONV;
+                origBack = newBack;
+                backDev = 0;
+            }
+            back = newBack;
+            updateLiDARScan(lidarScan);
+            newBack = getDistHelper(lidarScan, 180);
+            // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
+        }
+    } else if (conv_front) {
+        while (one_more_chance--) {
+            toggle = -1*toggle;
+            frontDev += toggle * (origFront - newFront);
+            if (frontDev < CONVERGENCE) conv_front--;
+            else {
+                conv_front = NUM_CONV;
+                origFront = newFront;
+                frontDev = 0;
+            }
+            front = newFront;
+            updateLiDARScan(lidarScan);
+            newFront = getDistHelper(lidarScan, 0);
+            // printf("OrigFront: %f ?= newFront: %f\n", origFront, newFront);
+        }
+    }
+
+    if (conv_front <= 0) *frontFinal = origFront;
+    else *frontFinal = -1;
+    if (conv_back <= 0) *backFinal = origBack;
+    else *backFinal = -1;
+
+    // while (convergence) {
+
+
+    //     if ((origFront - newFront) < CONVERGENCE && (origBack - newBack) < CONVERGENCE) {
+    //         convergence--;
+    //     } else {
+    //         convergence = NUM_CONV;
+    //         origFront = newFront;
+    //         origBack = newBack;
+    //     }
+
+
+    //     front = newFront;
+    //     back = newBack;
+    //     updateLiDARScan(lidarScan);
+    //     newFront = getDistHelper(lidarScan, 0);
+    //     newBack = getDistHelper(lidarScan, 180);
+    // }
+
+    // *frontFinal = origFront;
+    // *backFinal = origBack;
 }
 
 float getFrontDist(float* procScanSamp) {
-    return procScanSamp[0];
+    // return procScanSamp[0];
 
     return getDistHelper(procScanSamp, 0);
 }
 
 float getBackDist(float* procScanSamp) {
-    return procScanSamp[FINAL_NUM_POINTS/2];
+    // return procScanSamp[FINAL_NUM_POINTS/2];
 
-    return (-1) * getDistHelper(procScanSamp, 180);
+    return getDistHelper(procScanSamp, 180);
 }
 
-void doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int cm, bool* obstacleFlag, bool* distanceDoneFlag) {
+bool doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int cm, bool* obstacleFlag, bool* distanceDoneFlag) {
     float newFront = getFrontDist(procScanSamp);
     float newBack = getBackDist(procScanSamp);
-    char lo[100];
+    // char lo[100];
 
-    float deltaFront = fabs(prevFront - newFront);
-    float deltaBack = fabs(prevBack - newBack);
+    // float deltaFront = fabs(prevFront - newFront);
+    // float deltaBack = fabs(prevBack - newBack);
 
-    snprintf(lo, 100, "deltas_%f_%f", deltaFront, deltaBack);
-    prints(lo);
-    
-    if (prevFront > prevBack) {
-        if (fabs(prevFront - newFront) >= cm * 10) {
-            *distanceDoneFlag = true;
-            // snprintf(lo, 100, "1_abs_diff_%f", fabs(prevFront - newFront));
-            // prints(lo);
-            return;
-        }
-    } else {
-        if (fabs(prevBack - newBack) >= cm * 10) {
-            *distanceDoneFlag = true;
-            // snprintf(lo, 100, "2_abs_diff_%f", fabs(prevFront - newFront));
-            // prints(lo);
-            return;
-        }
-    }
+    // snprintf(lo, 100, "deltas_%f_%f", deltaFront, deltaBack);
+    // prints(lo);
+
+    // if (prevFront > prevBack) {
+    //     if (fabs(prevFront - newFront) >= cm * 10) {
+    //         *distanceDoneFlag = true;
+    //         // snprintf(lo, 100, "1_abs_diff_%f", fabs(prevFront - newFront));
+    //         // prints(lo);
+    //         return;
+    //     }
+    // } else {
+    //     if (fabs(prevBack - newBack) >= cm * 10) {
+    //         *distanceDoneFlag = true;
+    //         // snprintf(lo, 100, "2_abs_diff_%f", fabs(prevFront - newFront));
+    //         // prints(lo);
+    //         return;
+    //     }
+    // }
 
     // not optimized version
     // for(int i = 0; i < FINAL_NUM_POINTS; i++) {
@@ -369,20 +505,96 @@ void doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int cm,
     // }
 
     // OPTIMIZED VERSION (using Object_limit[OBJECT_RANGE])
-    int shift = FINAL_NUM_POINTS - END_ANGLE;
-    for(int i = 0; i <= END_ANGLE; i++) {
-        if ((procScanSamp[i] - object_limit[i]) <= 0) {
-            *obstacleFlag = true;
-            return;
+    int count = 0;
+    int shift = FINAL_NUM_POINTS - END_ANGLE_R;
+    for(int i = 0; i <= END_ANGLE_R; i++) {
+        if ((procScanSamp[i] > 10) && (procScanSamp[i] - object_limit_r[i]) < 0) {
+            count++;
+            if (count > 10) {
+                return true;
+            }      
         }
     }
-    for(int i = 0; i < END_ANGLE; i++) {
-        if ((procScanSamp[i + shift] - object_limit[i + END_ANGLE + 1]) <= 0) {
-            *obstacleFlag = true;
-            return;
+    for(int i = 0; i < END_ANGLE_R; i++) {
+        if ((procScanSamp[i] > 10) && (procScanSamp[i + shift] - object_limit_r[i + END_ANGLE_R + 1]) < 0) {
+            count++;
+            if (count > 10) {
+                return true;
+            }
         }
     }
+    
+    return false;
 }
+
+bool isThereObstacle_s(float* procScanSamp, int tolerance) {
+    int count = 0;
+    // int shift = FINAL_NUM_POINTS - END_ANGLE;
+    // for(int i = 0; i <= END_ANGLE; i++) {
+    //     if ((procScanSamp[i] > 10) && (procScanSamp[i] - object_limit[i]) < tolerance) {
+    //         count++;
+    //         printf("At Angle = %d, distance is %f", i, procScanSamp[i]);
+    //         if (count > 3) {
+    //             return true;
+    //         }      
+    //     }
+    // }
+    // for(int i = 0; i < END_ANGLE; i++) {
+    //     if ((procScanSamp[i + shift] > 10) && (procScanSamp[i + shift] - object_limit[i + END_ANGLE + 1]) < tolerance) {
+    //         count++;
+    //         printf("At Angle = %d, distance is %f", i, procScanSamp[i]);
+    //         if (count > 3) {
+    //             return true;
+    //         }
+    //     }
+    // }
+
+    int start_idx = FINAL_NUM_POINTS - END_ANGLE_S;
+    int idx = start_idx;
+    int j = 0;
+    int prev_j = -2;
+    while (j <= OBJECT_RANGE_S) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_s[j]) < tolerance) {
+            if ((prev_j - j + 1) < 5) count++;
+            else count = 0;
+            prev_j = j;
+            printf("At Angle = %d, distance is %f\n", idx, procScanSamp[idx]);
+            if (count > 2) {
+                return true;
+            }      
+        }
+        j++;
+        idx = (start_idx + j) % 360;
+    }
+
+    return false;
+}
+
+bool isThereObstacle_r(float* procScanSamp, int tolerance) {
+    int count = 0;
+
+    int start_idx = FINAL_NUM_POINTS - END_ANGLE_R;
+    int idx = start_idx;
+    int j = 0;
+    int prev_j = -2;
+    while (j <= OBJECT_RANGE_R) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < tolerance) {
+            if ((prev_j - j + 1) < 5) count++;
+            else count = 0;
+            prev_j = j;
+            printf("At Angle = %d, distance is %f\n", idx, procScanSamp[idx]);
+            if (count > 2) {
+                return true;
+            }      
+        }
+        j++;
+        idx = (start_idx + j) % 360;
+    }
+
+    return false;
+}
+
+
 
 int angleDiff(float* prevScan, float* newScan) {
     int minDiffForCurrInitScan = INT_MAX;

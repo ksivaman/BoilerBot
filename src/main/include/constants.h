@@ -5,9 +5,11 @@
 #define LOCK_GPIO 25
 #define NUM_SAMPLES 400
 
-#define FRONT_SCAN_WIDTH 50.0 //mm
-#define SEARCH_DEGREE_RANGE 30
+#define FRONT_SCAN_WIDTH 450.0 //mm
+#define SEARCH_DEGREE_RANGE 45
 #define SIMILAR_THRESH 30000
+
+#define SQUARE_WIDTH 85.0 // cm
 
 #define ROBOT_WIDTH 270.0 //mm
 #define ROBOT_LENGTH 340.0 //mm

@@ -300,7 +300,7 @@ void app_main(void) {
     ledc_channel_config(&ledc_channel);
 
     // Initialize fade service.
-    ledc_fade_func_install(0);
+    // ledc_fade_func_install(0);
 
     rover robot1 = {
         .pwm = ledc_channel,
@@ -315,13 +315,36 @@ void app_main(void) {
         },
     };
 
+    // vTaskDelay(4000 / portTICK_PERIOD_MS);
+    bool obstacle = false;
+    
     //Initialize LiDAR stuff
     init_lidar();
+
+    // float moved = burst_rover(robot1, 6, NORTH, &obstacle);
+
+    float frontDist = -1;
+    float backDist = -1;
+
+    // Testing obstacle Detection
+    float * newScan = getLiDARScan();
+    // while(1) {
+    //     obstacle = isThereObstacle(newScan, -50);
+    //     printf("Obstacle?: %d\n", (int) obstacle);
+    //     updateLiDARScan(newScan);
+    //     // getFrontBackDist(&frontDist, &backDist);
+    //     // printf("Front = %f mm, Back = %f mm\n", frontDist, backDist);
+    // }
     // Point secondClose = {-1, -1};
     // int angle;
 
-    bool obstacle;
-    float moved = burst_rover(robot1, 114, NORTH, &obstacle);
+    printf("StartingBurst\n");
+    float moved = burst_rover(robot1, 3* 85, NORTH, &obstacle);
+    printf("BustEnded, moved: %f\n", moved);
+
+    printf("StartingTurn\n");
+    float turned = turn_rover(robot1, 90, RIGHT);
+    printf("TurnEnded, turned: %f\n", turned);
     // burst_rover(robot1, 85, FORWARD);
     snprintf(lo, 114, "moved_%f___obstacle_%d", moved, obstacle);
     prints(lo);
