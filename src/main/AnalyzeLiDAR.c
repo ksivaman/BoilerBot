@@ -470,8 +470,8 @@ float getBackDist(float* procScanSamp) {
 }
 
 bool doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int cm, bool* obstacleFlag, bool* distanceDoneFlag) {
-    float newFront = getFrontDist(procScanSamp);
-    float newBack = getBackDist(procScanSamp);
+    // float newFront = getFrontDist(procScanSamp);
+    // float newBack = getBackDist(procScanSamp);
     // char lo[100];
 
     // float deltaFront = fabs(prevFront - newFront);

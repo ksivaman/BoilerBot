@@ -13,6 +13,7 @@
 #include "esp_err.h"
 #include "include/AnalyzeLiDAR.h"
 #include "include/astar.h"
+#include "include/navigation.h"
 
 #include "esp_timer.h"
 
@@ -60,18 +61,7 @@
 #define DEGREE_PER_SEC_2 (2048) //(3584)
 #define HOPES 850
 
-
-enum dir{FORWARD, BACKWARD, RIGHT, LEFT, STOP};
-
-typedef struct {
-    ledc_channel_config_t pwm;
-    gpio_num_t motor_1;
-    gpio_num_t motor_2;
-    gpio_num_t motor_3;
-    gpio_num_t motor_4;
-    enum compass heading;
-    Point currLoc;
-} rover;
+void motor_forward(rover robot);
 
 void motor_forward(rover robot) {
     gpio_set_level(robot.motor_1, 1);
@@ -172,7 +162,7 @@ float burst_rover(rover robot, int cm, enum compass heading, bool * earlyStop) {
     int64_t time_start = 0;
     float time_run;
 
-    int move; // next moving amount
+    // int move; // next moving amount
     // char lo[100];
     int64_t waitTime = esp_timer_get_time();
     int64_t newTime = esp_timer_get_time(); 
@@ -440,7 +430,7 @@ int turn_rover(rover robot, int degree, enum dir direction) {
     int turn;
     short speed = (robot.currLoc.y < 3) ? DEGREE_PER_SEC_FAST : DEGREE_PER_SEC_SLOW;
 
-    while (abs(angleTurned - requestedDegree) > 4) {
+    while (abs(angleTurned - requestedDegree) > 1) {
         if (degree > 0) {
             motor_right(robot);
         } else {
@@ -464,6 +454,7 @@ int turn_rover(rover robot, int degree, enum dir direction) {
 
         angleTurned = angleDiff(prevScan, newScan);
         degree = requestedDegree - angleTurned;
+        printf("___ angle turned: %f\n", angleTurned);
     }
 
     free(prevScan);

@@ -2,16 +2,41 @@
 #include "include/AnalyzeLiDAR.h"
 #include "include/navigation.h"
 
-void navigate(Path* pathStart, enum compass* currHeading) {
+void navigate(Path* pathStart, enum compass* currHeading, rover * robot1) {
     // Pointer to traverse through A* path
     Path* path = pathStart;
     // Navigate until at end of A* path (when path->next == NULL)
     while(path->next != NULL) {
         int turnAngle = getTurnAngle(path, currHeading);
         Path* burstStart = path;
-
+        robot1->currLoc.x = path->data.x;
+        robot1->currLoc.y = path->data.y;
         // TODO: Call Jin's turn function based on turnAngle
         printf("__________ Turning %d degrees\n", turnAngle);
+        turn_rover(*robot1, turnAngle, RIGHT);
+        float * newScan = getLiDARScan();
+        int angle;
+        absoluteErrorFrom(newScan, path->data, &angle);
+        free(newScan);
+        printf("__________ Correcting turn by %d degrees\n", *currHeading-angle);
+        int subangle = 0;
+
+        if (angle > 180){
+            angle -= 360;
+        }
+
+        if (*currHeading == 270){
+            subangle = -90;
+        }
+        else {
+            subangle = *currHeading;
+        }
+
+        if (abs(subangle - angle) > 5 )
+            turn_rover(*robot1, subangle-angle , RIGHT);
+          
+
+        // vTaskDelay(7000 / portTICK_PERIOD_MS);
 
         // Find burst direction
         int changeXDir = path->next->data.x - path->data.x;
@@ -70,6 +95,9 @@ void navigate(Path* pathStart, enum compass* currHeading) {
         }
 
         printf("__________ Bursting %d blocks to (%d, %d)\n", burstLen, burstEndPoint.x, burstEndPoint.y);
+        bool obstacle = false;
+        robot1->heading = *currHeading;
+        burst_rover(*robot1, burstLen * SQUARE_WIDTH, *currHeading, &obstacle);
 
         // TODO: burst(burstLen, burstEndPoint) // Pass in distance, and the final point. burst till you reach that point
 
@@ -180,4 +208,3 @@ int getTurnAngle(Path* path, enum compass* currHeading) {
 //         turnLeft = newchangeDir > 0? false : true;
 //     }
 // }
->>>>>>> ea355e1c53446450c8bb162744c61fdce4448a43
