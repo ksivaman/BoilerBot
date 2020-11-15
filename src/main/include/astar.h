@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include "constants.h"
 
+
+
 typedef struct point { //data structure representing 1 coordinate
     int x;
     int y;
@@ -29,6 +31,8 @@ Point pop(PQueue** head);
 void push(PQueue** head, Point d, int p);
 int isEmpty(PQueue** head);
 void freePQueue(PQueue * pq);
+
+bool isPointEqual(Point p1, Point p2);
 
 //A* related functions
 Path* getPathAStar(int numRows, int numCols, int grid[][numCols], Point start, Point end);

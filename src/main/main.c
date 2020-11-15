@@ -11,6 +11,10 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/ledc.h"
+#include "esp_err.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -22,6 +26,7 @@
 #include "AnalyzeLiDAR.c"
 #include "esp_timer.h"
 #include "motor_main.c"
+#include <stdlib.h>
 #include "navigation.c"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
@@ -219,9 +224,7 @@ void app_main(void) {
     Point start, end, curr; 
     start.x = 0; start.y = 0; end.x = 0; end.y = 0;
     curr.x = 2; curr.y = 1;
-    char buf[1024];
-    char lo[100]; //debug print buffer
-
+    char buf[100];
     printf("__________ Wassup. Im here. Back at work. Lets go...\n");
 
     //Initialize NVS
@@ -316,27 +319,164 @@ void app_main(void) {
     };
 
     // vTaskDelay(4000 / portTICK_PERIOD_MS);
-    // bool obstacle = false;
+    bool obstacle = false;
     
     //Initialize LiDAR stuff
+    printf("turningOn Lidar\n");
     init_lidar();
+    vTaskDelay(4000 / portTICK_PERIOD_MS);
 
-    // float moved = burst_rover(robot1, 6, NORTH, &obstacle);
+    // float moved = burst_rover(robot1, SQUARE_WIDTH, NORTH, &obstacle);
+    // printf("BustEnded, moved: %f\n", moved);
+
+    // Point test_curr = {3,5};
+    // // printf("Curr = (%d, %d)\n", curr.x, curr.y);
+    // int offsetNorth = 0;
+    // int offsetEast = 0;
+    // float * newScan = getLiDARScan();
+    // robot1.currLoc = test_curr;
+    // robot1.heading = WEST;
+    // float frontDist, backDist;
+    // // Point secondClose = {-1, -1};
+    // // int angle;
+    // // printf("%lf\n", sqrt(5));
+    // while(1) {
+    //     updateLiDARScan(newScan);
+    //     // robot1.currLoc = getCurrLoc();
+    //     // printf("CurrLoc = (%d, %d)\n", robot1.currLoc.x, robot1.currLoc.y);
+    //     // int angleOffset = getAngleOffset(robot1);
+    //     // angleOffsetHelper(newScan, 45, WEST);
+    //     // printf("AngleOffset = %d\n", angleOffset);
+
+    //     obstacle = isThereObstacle_r(newScan, 0, FORWARD);
+    //     printf("Obstacle_r: %d\n", (int) obstacle);
+    //     obstacle = isThereObstacle_s(newScan, 0, FORWARD);
+    //     printf("Obstacle_s: %d\n", (int) obstacle);
+
+    //     // printf("Orig Version\n");
+    //     // test_curr = getCurrLoc();
+    //     // int error = absoluteErrorFrom(newScan, test_curr, &angle);
+    //     // printf("New Version\n");
+    //     // test_curr = get_curr_loc_input(NORTH, &angle, &secondClose);
+
+    //     // printf("New Version\n");
+    //     // getOffsets(robot1, &offsetNorth, &offsetEast);
+    //     // printf("North %d, East: %d\n", offsetNorth, offsetEast);
+    //     // printf("\n\n");
+    //     // printf("Orig Version\n");
+    //     // getOffSetFrom(newScan, test_curr, &offsetNorth, &offsetEast);
+    //     // printf("North %d, East: %d\n", offsetNorth, offsetEast);
+    //     // printf("\n\n");
+
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    //     // getFrontBackDist(&frontDist, &backDist);
+    //     // printf("Front = %f mm, Back = %f mm\n", frontDist, backDist);   
+    // }
+
+    bool earlyStop = false;
+    robot1.heading = NORTH;
+    // robot1.currLoc = getCurrLoc();
+
+    reposition(&robot1);
+    // float * newScan = getLiDARScan();
+    // int offset_a = getAngleOffset(robot1);
+    // float cm_right = fabs(offsetHelper(newScan, 30, 0, EAST, 1));
+    // float cm_left = fabs(offsetHelper(newScan, 30, 0, WEST, 1));
+    // printf("cm_right = %f, cm_left = %f\n", cm_right, cm_left);
+    // getOut(robot1, offset_a, (cm_right < cm_left) ? RIGHT : LEFT);
+    // while (1) {
+    //     robot1.currLoc = getCurrLoc();
+    //     printf("CurrLoc = (%d, %d)\n", robot1.currLoc.x, robot1.currLoc.y);
+    //     int offset_n, offset_e;
+        //     getOffsets(robot1, &offset_n, &offset_e);
+    //     printf("North %d, East: %d\n", offset_n, offset_e);
+
+    //     int move = 0;
+    //     if ((robot1.heading == EAST || robot1.heading == WEST)) {
+    //         while (abs(offset_e) > 2) {
+    //             if (abs(offset_e) > OBSTACLE_FREE_BOUND) {
+    //                 do {
+    //                     move = OBSTACLE_FREE_BOUND;
+    //                     printf("move: %d\n", move);
+    //                     burst_rover(robot1, move, (offset_e > 0) ? WEST : EAST);
+    //                     offset_e = (offset_e > 0) ? (offset_e - OBSTACLE_FREE_BOUND) : (offset_e + OBSTACLE_FREE_BOUND);
+    //                 } while (abs(offset_e) > OBSTACLE_FREE_BOUND);
+    //             }
+    //             burst_rover(robot1, abs(offset_e), (offset_e > 0) ? WEST : EAST);
+    //             getOffsets(robot1, &offset_n, &offset_e);
+    //         }
+    //     } else {
+    //         while (abs(offset_n) > 2) {
+    //             if (abs(offset_n) > OBSTACLE_FREE_BOUND) {
+    //                 do {
+    //                     move = OBSTACLE_FREE_BOUND;
+    //                     printf("move: %d\n", move);
+    //                     burst_rover(robot1, move, (offset_n > 0) ? SOUTH : NORTH);
+    //                     offset_n = (offset_n > 0) ? (offset_n - OBSTACLE_FREE_BOUND) : (offset_n + OBSTACLE_FREE_BOUND);
+    //                 } while (abs(offset_n) > OBSTACLE_FREE_BOUND);
+    //             }
+    //             burst_rover(robot1, abs(offset_n), (offset_n > 0) ? SOUTH : NORTH);
+    //             getOffsets(robot1, &offset_n, &offset_e);
+    //         }
+    //     }
+    // }
+    
+    while(1);
+
+    burst_rover(robot1, 85, NORTH);
+
+
+    robot1.currLoc.x = 1;
+    robot1.currLoc.y = 2;
+    robot1.heading = NORTH;
+    burst_rover(robot1, 2 * 85, NORTH);
+    robot1.currLoc.x = 3;
+    robot1.currLoc.y = 2;
+
+    turn_rover(robot1, -90, RIGHT);
+    robot1.heading = WEST;
+
+    burst_rover(robot1, 3 * 85, WEST);
+    robot1.currLoc.x = 3;
+    robot1.currLoc.y = 5;
+
+    turn_rover(robot1, -90, RIGHT);
+    robot1.heading = SOUTH;
+
+    burst_rover(robot1, 3 * 85, SOUTH);
+    robot1.currLoc.x = 0;
+    robot1.currLoc.y = 5;
+
+    turn_rover(robot1, 90, RIGHT);
+    robot1.heading = WEST;
+
+    burst_rover(robot1, 85, WEST);
+    robot1.currLoc.x = 0;
+    robot1.currLoc.y = 6;
+
+    while(1);
+
 
     // float frontDist = -1;
     // float backDist = -1;
+    // printf("GetCurrLoc\n");
+    // curr = getCurrLoc();
+    // printf("Curr = (%d, %d)\n", curr.x, curr.y);
+    // robot1.currLoc.x = curr.x;
+    // robot1.currLoc.y = curr.y;
+    // printf("AdjustHeading\n");
+    // adjustHeading(&robot1);
 
-    // // Testing obstacle Detection
-    // float * newScan = getLiDARScan();
-    // while(1) {
-    //     obstacle = isThereObstacle(newScan, -50);
-    //     printf("Obstacle?: %d\n", (int) obstacle);
-    //     updateLiDARScan(newScan);
-    //     // getFrontBackDist(&frontDist, &backDist);
-    //     // printf("Front = %f mm, Back = %f mm\n", frontDist, backDist);
-    // }
-    // Point secondClose = {-1, -1};
-    // int angle;
+    // start.x = 0; start.y = 4;
+    // end.x = 3; end.y = 4;
+
+    // Path * testPath = getPathAStar(NROWS, NCOLS, fplan, start, end);
+    // printf("CallingNavigation\n");
+    // navigate(testPath, &robot1);
+    // Testing obstacle Detection
+    
+    
 
     // printf("StartingBurst\n");
     // float moved = burst_rover(robot1, 3* 85, NORTH, &obstacle);
@@ -385,6 +525,8 @@ void app_main(void) {
     //     printf("Angle: %d, currHeading = %d, angleDiff %d \n", angle, currHead, angle - subangle);
     //     vTaskDelay(2000 / portTICK_PERIOD_MS);
     // }
+
+    
     
 
     // if (abs(subangle - angle) > 5 )
@@ -395,6 +537,8 @@ void app_main(void) {
     // turn_rover(robot1, 90, RIGHT);
     // turn_rover(robot1, 90, RIGHT);
     // if (1) return;
+
+
 
     // Wait till there is a request
     printf("__________ Waiting for new delivery request...\n");
@@ -407,6 +551,14 @@ void app_main(void) {
     printf("__________ Found new delivery request!\n");
 
     getRequest(buf, &start, &end);
+
+    printf("GetCurrLoc\n");
+    curr = getCurrLoc();
+    printf("Curr = (%d, %d)\n", curr.x, curr.y);
+    robot1.currLoc.x = curr.x;
+    robot1.currLoc.y = curr.y;
+    printf("AdjustHeading\n");
+    adjustHeading(robot1);
  
     printf("Start: (%d, %d); End: (%d, %d)\n", start.x, start.y, end.x, end.y);
 
@@ -417,7 +569,22 @@ void app_main(void) {
 
     // Go from curr to start
     printf("__________ Navigating from curr to start...\n");
-    // TODO: navigate(path);
+    // while (!isPointEqual(robot1.currLoc, start)) {
+    //     navigate(path, &heading, &robot1);
+    // }
+    // navigate(path, &heading, &robot1);
+    int angle;
+    Point secondClose;
+
+    // int navigateFlag = navigate(path, &heading, &robot1);
+    // while ((navigateFlag == -1) && !isPointEqual(robot1.currLoc, start)) {
+    //     path = getPathAStar(NROWS, NCOLS, fplan, robot1.currLoc, start);
+    //     navigateFlag = navigate(path, &heading, &robot1);
+    //     curr = get_curr_loc_input(robot1.heading, &angle, &secondClose);
+    //     printf("Curr_1 = (%d, %d)\n", curr.x, curr.y);
+    //     robot1.currLoc.x = curr.x;
+    //     robot1.currLoc.y = curr.y;
+    // } 
 
     printf("__________ Waiting for sender to start delivery...\n");
     while ((read_bytes = get_url_content("http://boilerbot-289518.uc.r.appspot.com/admin/has_delivery_started", buf, 3)) <= 2){
@@ -435,7 +602,19 @@ void app_main(void) {
 
     // TODO: navigate(path);
     printf("__________ Navigating from start to end...\n");
-    navigate(path, &heading, &robot1);
+    // navigate(path, &robot1);
+    // navigate(path, &heading, &robot1);
+    
+    // navigateFlag = navigate(path, &heading, &robot1);
+    //     while ((navigateFlag == -1) && !isPointEqual(robot1.currLoc, end)) {
+    //     path = getPathAStar(NROWS, NCOLS, fplan, robot1.currLoc, end);
+    //     navigateFlag = navigate(path, &heading, &robot1);
+    //     curr = get_curr_loc_input(robot1.heading, &angle, &secondClose);
+    //     printf("Curr_2 = (%d, %d)\n", curr.x, curr.y);
+    //     robot1.currLoc.x = curr.x;
+    //     robot1.currLoc.y = curr.y;
+    // } 
+
     // vTaskDelay(30000/ portTICK_PERIOD_MS); // simulating the navigate func
 
     printf("__________ Reached destination!\n");
@@ -458,3 +637,5 @@ void app_main(void) {
     printf("__________ Done. Successfully I hope...\n");
 
 }
+
+// getCurPath, 

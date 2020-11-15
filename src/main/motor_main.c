@@ -56,8 +56,8 @@
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IN_1) | (1ULL<<GPIO_OUTPUT_IN_2) | (1ULL<<GPIO_OUTPUT_IN_3) | (1ULL<<GPIO_OUTPUT_IN_4))
 
 #define MM_PER_SEC (768)
-#define DEGREE_PER_SEC_FAST (3072) //(4096)
-#define DEGREE_PER_SEC_SLOW (2560)
+#define DEGREE_PER_SEC_FAST (2870) //(3072)
+#define DEGREE_PER_SEC_SLOW (2300) //(2560)
 #define DEGREE_PER_SEC_2 (2048) //(3584)
 #define HOPES 850
 
@@ -98,41 +98,61 @@ void motor_left(rover robot) {
     gpio_set_level(robot.motor_4, 0);
 }
 
-// void rover_run(rover robot, int speed, enum dir direction, bool acc) {
-//     ledc_channel_config_t channel = robot.pwm;
-
-//     if (direction == FORWARD) {
-//         motor_forward(robot);
-//     } else if (direction == BACKWARD) {
-//         motor_backward(robot);
-//     } else if (direction == RIGHT) {
-//         motor_right(robot);
-//     } else if (direction == LEFT) {
-//         motor_left(robot);
-//     } else {
-//         motor_stop(robot);
-//     }
-
-//     if (acc) {
-//         ledc_set_fade_with_time(channel.speed_mode, channel.channel, speed, MOTOR_ACCELERATE);
-//         ledc_fade_start(channel.speed_mode, channel.channel, LEDC_FADE_NO_WAIT);
-//     } else {
-//         ledc_set_duty(channel.speed_mode, channel.channel, speed);
-//         ledc_update_duty(channel.speed_mode, channel.channel);
-//     }
-
-// }
-#define OBJECT_TOLERANCE 0 //mm
-#define OBSTACLE_WAIT_DURATION 9000000
-
-
 void toggleMotor(ledc_channel_config_t channel, int speed) {
     ledc_set_duty(channel.speed_mode, channel.channel, speed);
     ledc_update_duty(channel.speed_mode, channel.channel);
 }
 
-// returns -1 when moved distance cannot be calculated
-float burst_rover(rover robot, int cm, enum compass heading, bool * earlyStop) {
+
+void backOff(rover robot) {
+    ledc_channel_config_t channel = robot.pwm;
+    int time_run = 586; // 4.25cm MOVE_SECOND_BOUND
+
+    motor_backward(robot);
+    toggleMotor(channel, MM_PER_SEC);
+    vTaskDelay(time_run / portTICK_PERIOD_MS);
+
+    //////////////////////////////break
+    motor_stop(robot);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    motor_forward(robot);
+    toggleMotor(channel, 512);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    motor_stop(robot);
+    toggleMotor(channel, 0);
+    /////////////////////////////
+}
+
+int getBurstTime(int cm, int *remain) {
+    int runTime = 0;
+    if (cm <= 48) { runTime = 500; cm -= 19;
+    } else if (cm <= 79) { runTime = 1000; cm -= 48;
+    } else if (cm <= 110) { runTime = 2000; cm -= 79;
+    } else if (cm <= 143) { runTime = 2900; cm -= 110;
+    } else if (cm <= 176) { runTime = 3800; cm -= 143;
+    } else if (cm <= 205) { runTime = 4600; cm -= 176;
+    } else if (cm <= 237) { runTime = 5500; cm -= 205;
+    } else if (cm <= 268) { runTime = 6400; cm -= 237;
+    } else { runTime = 7000; cm -= 268;
+    }
+    *remain = cm + 5;
+    return runTime;
+}
+
+#define OBSTACLE_FREE_BOUND 22
+#define MOVE_FIRST_BOUND 8.5
+#define MOVE_SECOND_BOUND 4.25
+#define OBJECT_TOLERANCE 0 //mm
+#define OBSTACLE_WAIT_DURATION 5000000 //us
+
+float burst_rover(rover robot, int cm, enum compass heading) {
+    // Determine wheather to move front or back
+    ledc_channel_config_t channel = robot.pwm;
+
+    if (cm > SQUARE_WIDTH * 4) {
+        cm = SQUARE_WIDTH * 4;
+    }
+
     enum dir direction;
     if (robot.heading == heading) {
         direction = FORWARD;
@@ -142,164 +162,147 @@ float burst_rover(rover robot, int cm, enum compass heading, bool * earlyStop) {
         motor_stop(robot);
         return 0;
     }
-    ledc_channel_config_t channel = robot.pwm;
-
     float distanceMoved = 0; // total distance moved
     int requestedDist = cm; // total distance requested to be moved
-
-    bool obstacleFlag = false;
-    // bool distanceFlag = false;
-
-    float* lidarScan = getLiDARScan();
-    float prevFront = -1, prevBack = -1;
-    // printf("HERE1\n");
-    getFrontBackDist(&prevFront, &prevBack);
-    if (prevBack == -1) // prevBack is more desired, so re try once more.
-        getFrontBackDist(&prevFront, &prevBack);
-
-    printf("Front = %f mm, Back = %f mm\n", prevFront, prevBack);
-    // printf("HERE2\n");
-    int64_t time_start = 0;
     float time_run;
+    
+    bool obstacleFlag = false;
 
-    // int move; // next moving amount
-    // char lo[100];
-    int64_t waitTime = esp_timer_get_time();
-    int64_t newTime = esp_timer_get_time(); 
-    obstacleFlag = isThereObstacle_s(lidarScan, 0);
-    while(obstacleFlag && ((float)(newTime - waitTime) < (float) OBSTACLE_WAIT_DURATION)) {
-        updateLiDARScan(lidarScan);
-        obstacleFlag = isThereObstacle_s(lidarScan, 0);
-        newTime = esp_timer_get_time();   
+    // Get initial distance measurements
+    float prevFront = -1, prevBack = -1;
+    if (requestedDist > OBSTACLE_FREE_BOUND){
+        getFrontBackDist(&prevFront, &prevBack);
+        if (prevBack == -1) // prevBack is more desired, so re try once more.
+            getFrontBackDist(&prevFront, &prevBack);
+        printf("burst_rover(): Front = %f mm, Back = %f mm\n", prevFront, prevBack);
     }
-    if ((float)(newTime - waitTime) >= (float) OBSTACLE_WAIT_DURATION) {
-        *earlyStop = true;
+    
+    // Initial Check for Obstacles
+    float* lidarScan = getLiDARScan();
+    obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? isThereObstacle_r(lidarScan, 0, direction) : isThereObstacle_s(lidarScan, 0, direction);
+    if (obstacleFlag) {
         free(lidarScan);
-        return distanceMoved;
+        return -1;
     }
-    bool first = true;
+    printf("burst_rover(): No Obstacle, starting to move\n");
 
-    while ((distanceMoved < requestedDist) && (fabs(distanceMoved - requestedDist) > 2.4)) {
+    
 
-        if (direction == FORWARD) { motor_forward(robot);  
-        } else if (direction == BACKWARD) { motor_backward(robot);
-        } else { motor_stop(robot); break;
-        }
-
-        if (cm > 25) {
-            // move = cm - 3;
-            // time_run = 27.765 * move + 390;
-            // time_run = 30*cm - 250;
-            time_run = 31.176 * cm - 350;
-        } else if (cm > 8) {
-            time_run = 486; // 8cm
+    // Internal loop to move requested distance
+    while ((distanceMoved < requestedDist) && (fabs(distanceMoved - requestedDist) > 2.3)) {
+        int remain = 0;
+        if (cm > OBSTACLE_FREE_BOUND) {
+            time_run = getBurstTime(cm - 5, &remain);
+        } else if (cm > MOVE_FIRST_BOUND) {
+            time_run = 486; // 8.5cm MOVE_FIRST_BOUND
         } else {
-            time_run = 300; // 4cm
+            time_run = 300; // 4.25cm MOVE_SECOND_BOUND
         }
+        printf("burst_rover(): time_run1 = %fms, remain = %dcm\n", time_run, remain);
 
         time_run *= 1000;
-        // Wait untill obstacle is gone
-        // if (cm > 10) 
-        if (/*obstacleFlag*/ !first && (cm > 10)) {
-            updateLiDARScan(lidarScan);
-            waitTime = esp_timer_get_time();
-            newTime = waitTime;
-            obstacleFlag = (cm > 10) ? isThereObstacle_r(lidarScan, 0) : isThereObstacle_s(lidarScan, 0);
-            while(obstacleFlag && ((float)(newTime - waitTime) < (float) OBSTACLE_WAIT_DURATION)) {
-                updateLiDARScan(lidarScan);
-                obstacleFlag = (cm > 10) ? isThereObstacle_r(lidarScan, 0) : isThereObstacle_s(lidarScan, 0);
-                newTime = esp_timer_get_time();   
-            }
-        } else {
-             vTaskDelay(200 / portTICK_PERIOD_MS);
-        }
-        first = false;
 
-        // printf("%lld\n", newTime - waitTime);
-        // printf("%d\n", OBSTACLE_WAIT_DURATION);
-        // printf("(float)(newTime - waitTime) < OBSTACLE_WAIT_DURATION) = %d\n", (float)(newTime - waitTime) < (float) OBSTACLE_WAIT_DURATION);
-        if ((float)(newTime - waitTime) >= (float) OBSTACLE_WAIT_DURATION) {
-            *earlyStop = true;
+        bool earlyStop = false;
+        int64_t time_end = 0;
+        int64_t time_start = 0;
+
+        bool run = true;
+        while(run) {
+            printf("run_motor(): Turnning on motor\n");
+            /////////////////////////////// run_motor()
+            if (direction == FORWARD) { motor_forward(robot);  
+            } else if (direction == BACKWARD) { motor_backward(robot);
+            } else { motor_stop(robot); return 1;
+            }
+            toggleMotor(channel, MM_PER_SEC);
+            time_start = esp_timer_get_time();
+            while (((float)(time_end - time_start) < time_run ) && !obstacleFlag) {
+                if(cm > OBSTACLE_FREE_BOUND) {
+                    updateLiDARScan(lidarScan);
+                    obstacleFlag = isThereObstacle_r(lidarScan, OBJECT_TOLERANCE, direction);
+                }
+                time_end = esp_timer_get_time();
+            }
+            ////////////////////////////// break
+            motor_stop(robot);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            if (direction == FORWARD) {  motor_backward(robot);
+            } else if (direction == BACKWARD) { motor_forward(robot);
+            } else { motor_stop(robot); return 1;
+            }
+            toggleMotor(channel, 512);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            motor_stop(robot);
+            toggleMotor(channel, 0);
+            earlyStop = ((float)(time_end - time_start) < time_run);
+            /////////////////////////////
+            printf("run_motor(): Stopped\n");
+
+            if (remain > OBSTACLE_FREE_BOUND) {
+                lidarScan = getLiDARScan();
+                obstacleFlag = isThereObstacle_r(lidarScan, 0, direction);
+                if (!obstacleFlag) {
+                    printf("burst_rover(): Remain big Enough\n");
+                    time_run = getBurstTime(remain, &remain);
+                    printf("burst_rover(): time_run2 = %f\n", time_run);
+                    time_run *= 1000;
+                } else {
+                    run = false;
+                }
+                remain = 0;
+            } else {
+                run = false;
+            }
+        }
+
+        if (earlyStop) { // Obstacles is here, just exit.
+            printf("Stopped due to obstacle");
             free(lidarScan);
-            return distanceMoved;
-        }
-        printf("HERE5\n");
-       
-        // Turn on Motor
-        toggleMotor(channel, MM_PER_SEC);
-        time_start = esp_timer_get_time();
-
-        while (((float)(esp_timer_get_time() - time_start) < time_run ) && !obstacleFlag) {
-            if(cm > 25) {
-                updateLiDARScan(lidarScan);
-                obstacleFlag = isThereObstacle_r(lidarScan, OBJECT_TOLERANCE);
-            }
+            return -1;
         }
 
-        //////////////////////////////break
-        motor_stop(robot);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        if (direction == FORWARD) {  motor_backward(robot);
-        } else if (direction == BACKWARD) { motor_forward(robot);
-        } else { motor_stop(robot); break;
-        }
-
-        toggleMotor(channel, 512);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        motor_stop(robot);
-        toggleMotor(channel, 0);
-        /////////////////////////////
-
-
+        // no obstacle, continue running.
         // Calculate Distance
-        
-        // updateLiDARScan(lidarScan);
-        // float newFront = getFrontDist(lidarScan);
-        // float newBack = getBackDist(lidarScan);
         float delta, deltaBack, deltaFront;
-        if (cm > 25) {
+        if (cm > OBSTACLE_FREE_BOUND) {
             float newFront = -1, newBack = -1;
             getFrontBackDist(&newFront, &newBack);
-            if (obstacleFlag) newFront = -1; // if we stopped due to obstacle, we disregard front measurement
 
             // Case when distance cannot be calculated
             if (prevFront == -1 && newBack == -1) { // try one more scan
                 getFrontBackDist(&newFront, &newBack);
                 if (newBack == -1) {
                     free(lidarScan);
-                    *earlyStop = true;
+                    printf("here 1\n");
                     return -1;
-                    printf("here 1");
                 }
             }
             if (prevBack == -1 && newFront == -1) { // try one more scan
                 getFrontBackDist(&newFront, &newBack);
-                if (obstacleFlag) newFront = -1;
                 if (newFront == -1) {
                     free(lidarScan);
-                    *earlyStop = true;
-                    return -1;
-                    printf("here 2");
+                    printf("here 2\n");
+                    return -1;         
                 }
             }
-            printf("newFront = %f mm, newBack = %f mm\n", newFront, newBack);
             // Now at least one of them are ok
-
             
             deltaBack = newBack - prevBack;
             deltaFront = newFront - prevFront;
-            
+
+            printf("newFront = %f mm, newBack = %f mm\n", newFront, newBack);
             printf("deltaBack = %f mm, deltaFront = %f mm\n", deltaBack, deltaFront);
 
-            if (!obstacleFlag) {
-                if(fabs(deltaBack/10 - cm) > 30) {
-                    prevBack = -1;
-                    printf("here7_1");
-                }
-                if(fabs(deltaFront/10 - cm) > 30) {
-                    prevFront = -1;
-                    printf("here7_2");
-                }
+            // Consider the case when measurements being corrupted due to moving objects
+            if(fabs(deltaBack/10 - cm) > 33) {
+                prevBack = -1;
+                newBack = -1;
+                printf("here7_1\n");
+            }
+            if(fabs(deltaFront/10 - cm) > 33) {
+                prevFront = -1;
+                newFront = -1;
+                printf("here7_2\n");
             }
 
             if (direction == BACKWARD) {
@@ -307,32 +310,29 @@ float burst_rover(rover robot, int cm, enum compass heading, bool * earlyStop) {
                 deltaBack = deltaFront;
                 deltaFront = temp;
             }
-            // if both are avaliable
-            if (prevBack != -1 && prevFront != -1) {
+            
+            if ((prevBack != -1 && newBack != -1) && (prevFront != -1 && newFront != -1)) { // if both are avaliable
                 if (deltaBack >= 0 && deltaFront <= 0) { delta = (prevBack < prevFront) ? deltaBack : deltaFront;
                 } else if (deltaBack >= 0) { delta = deltaBack;
                 } else if (deltaFront <= 0) { delta = deltaFront;
                 } else { // both data useless
                     free(lidarScan);
-                    *earlyStop = true;
                     printf("here 3");
                     return -1;
                 }
-            } else if (prevBack != -1) {
+            } else if (prevBack != -1) { // back is avaliable
                 if (deltaBack >= 0) {
                     delta = deltaBack;
                 } else {
                     free(lidarScan);
-                    *earlyStop = true;
                     printf("here 4");
                     return -1;
                 }
-            } else { // (prevFront != -1)
+            } else { // (prevFront != -1) // front is avaliable
                 if (deltaFront <= 0) {
                     delta = deltaFront;
                 } else {
                     free(lidarScan);
-                    *earlyStop = true;
                     printf("here 5");
                     return -1;
                 }
@@ -341,70 +341,32 @@ float burst_rover(rover robot, int cm, enum compass heading, bool * earlyStop) {
 
             prevBack = newBack;
             prevFront = newFront;
-        } else if (cm > 8) {
-            delta = 8;
+
+        } else if (cm > MOVE_FIRST_BOUND) {
+            delta = MOVE_FIRST_BOUND;
         } else {
-            delta = 4;
+            delta = MOVE_SECOND_BOUND;
         }
         
-        printf("delat: %f\n", delta);
-        // snprintf(lo, 100, "deltas_%f", delta);
-        // prints(lo);
+        printf("delat: %f\n", delta);;
         distanceMoved += (delta);
         
-        cm = cm - distanceMoved;
-    }
+        // cm = cm - distanceMoved;
+        cm = cm - delta;
 
-    // snprintf(lo, 100, "out_%d_%d", (distanceMoved < requestedDist), (fabs(distanceMoved - requestedDist) > 1.5));
-    // prints(lo);
+        updateLiDARScan(lidarScan);
+        obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? isThereObstacle_r(lidarScan, 0, direction) : isThereObstacle_s(lidarScan, 0, direction);
+        if (obstacleFlag) {
+            free(lidarScan);
+            return -1;
+        }
+        // Continue unless there is obstacle in short-range;
+    }
 
     free(lidarScan);
     return distanceMoved;
     
 }
-
-// void burst_rover(rover robot, int cm, enum dir direction) {
-//     ledc_channel_config_t channel = robot.pwm;
-
-//     if (direction == FORWARD) {
-//         motor_forward(robot);
-//     } else if (direction == BACKWARD) {
-//         motor_backward(robot);
-//     } else {
-//         motor_stop(robot);
-//     }
-
-//     // float time = 30* cm + 280;
-//     float time = 27.765 * cm + 390;
-
-//     ledc_set_duty(channel.speed_mode, channel.channel, MM_PER_SEC);
-//     ledc_update_duty(channel.speed_mode, channel.channel);
-
-//     // while (time)
-
-//     vTaskDelay(time / portTICK_PERIOD_MS);
-    
-//     //////////////////////////////break
-//     motor_stop(robot);
-//     vTaskDelay(100 / portTICK_PERIOD_MS);
-    
-//     if (direction == FORWARD) {  
-//         motor_backward(robot);
-//     } else if (direction == BACKWARD) {
-//         motor_forward(robot);
-//     } else {
-//         motor_stop(robot);
-//     }
-
-//     ledc_set_duty(channel.speed_mode, channel.channel, 512);
-//     ledc_update_duty(channel.speed_mode, channel.channel);
-//     vTaskDelay(100 / portTICK_PERIOD_MS);
-//     motor_stop(robot);
-//     ledc_set_duty(channel.speed_mode, channel.channel, 0);
-//     ledc_update_duty(channel.speed_mode, channel.channel);
-//     /////////////////////////////
-    
-// }
 
 int turn_rover(rover robot, int degree, enum dir direction) {
     ledc_channel_config_t channel = robot.pwm;
@@ -429,6 +391,11 @@ int turn_rover(rover robot, int degree, enum dir direction) {
 
     int turn;
     short speed = (robot.currLoc.y < 3) ? DEGREE_PER_SEC_FAST : DEGREE_PER_SEC_SLOW;
+    if (robot.currLoc.y < 3) {
+        printf("Turning with Fast Speed\n");
+    } else {
+        printf("Turning with Slow Speed\n");
+    }
 
     while (abs(angleTurned - requestedDegree) > 1) {
         if (degree > 0) {
@@ -462,82 +429,6 @@ int turn_rover(rover robot, int degree, enum dir direction) {
 
     return angleTurned;
 }
-
-
-// bool getOutOfBorder(rover robot, Point curr, Point secondClose, enum compass moveToward) {
-//     int angleFacing;
-//     bool obstacleFlag;
-//     float * curr_scan = getLiDARScan();
-//     int curr_error = absoluteErrorFrom(curr_scan, curr, &angleFacing);
-//     int second_error = absoluteErrorFrom(curr_scan, secondClose, &angleFacing);
-//     while (abs(curr_error - second_error) > SIMILAR_THRESH && !obstacleFlag) {
-//         burst_rover(robot, 100, moveToward, &obstacleFlag);
-//         updateLiDARScan(curr_scan);
-//         curr_error = absoluteErrorFrom(curr_scan, curr, &angleFacing);
-//         second_error = absoluteErrorFrom(curr_scan, secondClose, &angleFacing);
-//     }
-//     free(curr_scan);
-//     return obstacleFlag;
-// }
-
-// int fitInSquare(rover robot) {
-//     int angleFacing = 0;
-//     Point secondClose = {0, 0};
-//     Point curr = get_curr_loc_input(robot.heading, &angleFacing, &secondClose);
-//     bool obstacleFlag = false;
-
-//     // Check if robot is within the border
-//     if (secondClose.x != -1) {
-//         // Assume robot is alwasy be vertically offset
-//         short delta_h = curr.x - secondClose.x;
-//         short delta_v = curr.y - secondClose.y;
-
-//         // check if two points are adjacent, and difference are alligned with robot's heading
-//         if ((robot.heading == NORTH || robot.heading == SOUTH) && abs(delta_v) == 1 && abs(delta_h) == 0) {
-//             enum compass moveToward = (delta_v < 0) ? SOUTH : NORTH;
-//             obstacleFlag = getOutOfBorder(robot, curr, secondClose, moveToward);
-//         }
-//         if ((robot.heading == EAST || robot.heading == WEST) && abs(delta_v) == 0 && abs(delta_h) == 1) {
-//             enum compass moveToward = (delta_h < 0) ? EAST : WEST;
-//             obstacleFlag = getOutOfBorder(robot, curr, secondClose, moveToward);
-//         }
-//     }
-
-//     if (obstacleFlag) {
-//         return -1;
-//     }
-
-//     float * curr_scan = getLiDARScan();
-//     // turn if needed
-//     absoluteErrorFrom(curr_scan, curr, &angleFacing);
-//     int degree = 0;
-//     degree = (robot.heading - angleFacing) % FINAL_NUM_POINTS;
-//     turn_rover(robot, degree, RIGHT);
-
-//     updateLiDARScan(curr_scan);
-//     int offsetX, offsetY;
-//     enum compass moveToward = NORTH;
-//     int cm = 0;
-//     getOffSetFrom(curr_scan, curr, &offsetX, &offsetY);
-//     free(curr_scan);
-    
-//     if ((robot.heading == NORTH || robot.heading == SOUTH)) {
-//         moveToward = (offsetY < 0) ? NORTH : SOUTH;
-//         cm = abs(offsetY);
-//     }
-//     if ((robot.heading == EAST || robot.heading == WEST)) {
-//         moveToward = (offsetX < 0) ? EAST : WEST;
-//         cm = abs(offsetX);
-//     }
-//     burst_rover(robot, cm, moveToward, &obstacleFlag);
-
-
-//     if (obstacleFlag) {
-//         return -1;
-//     }
-
-//     return 0;
-// }
 
 
 // void app_main(void)
