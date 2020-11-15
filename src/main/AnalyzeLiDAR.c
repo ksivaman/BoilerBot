@@ -520,7 +520,7 @@ bool isThereObstacle_a(float* procScanSamp, int offset) {
     int j = 0;
     int prev_j = -2;
     while (j <= OBJECT_RANGE_R) {
-        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < -50) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < -100) {
             if ((prev_j - j + 1) < 5) count++;
             else count = 0;
             prev_j = j;

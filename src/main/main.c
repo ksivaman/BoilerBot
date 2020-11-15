@@ -328,6 +328,8 @@ void app_main(void) {
     // start.x = 1;
     // start.y = 0;
     // navigate(&robot1, start);
+
+    // turn_rover(robot1, -180, RIGHT);
     // return;
 
     while(1) {

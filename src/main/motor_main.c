@@ -143,7 +143,7 @@ int getBurstTime(int cm, int *remain) {
 #define MOVE_FIRST_BOUND 8.5
 #define MOVE_SECOND_BOUND 4.25
 #define OBJECT_TOLERANCE 0 //mm
-#define OBSTACLE_WAIT_DURATION 7000000 //us
+#define OBSTACLE_WAIT_DURATION 8000000 //us
 
 float burst_rover(rover robot, int cm, enum compass heading) {
     // Determine wheather to move front or back
@@ -396,7 +396,7 @@ int turn_rover(rover robot, int degree, enum dir direction) {
         printf("Turning with Slow Speed\n");
     }
 
-    while (abs(angleTurned - requestedDegree) > 1) {
+    while (abs(angleTurned - requestedDegree) > 2) {
         if (degree > 0) {
             motor_right(robot);
         } else {
@@ -420,7 +420,15 @@ int turn_rover(rover robot, int degree, enum dir direction) {
 
         angleTurned = angleDiff(prevScan, newScan);
         degree = requestedDegree - angleTurned;
-        printf("___ angle turned: %f\n", angleTurned);
+        if (abs(degree) >= 180) {
+            if (degree > 0) {
+                degree = degree - 360;
+            } else {
+                degree = degree + 360;
+            }
+        }
+        printf("need to turn %d degree more\n", degree);
+        printf("___ angle turned: %f\n\n", angleTurned);
     }
 
     free(prevScan);

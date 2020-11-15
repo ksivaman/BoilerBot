@@ -17,12 +17,17 @@ void reposition(rover * robot) {
         }
     }
 
+    if (360 - 45 <= angle || angle < 90 - 45) robot->heading = NORTH;
+    else if (90 - 45 <= angle && angle < 180 - 45) robot->heading = EAST;
+    else if (180 - 45 <= angle && angle < 270 - 45) robot->heading = SOUTH;
+    else robot->heading = WEST;
+
     printf("angle is %d\n", angle);
 
     int turn = robot->heading - angle;
     if (abs(turn) > 180) {
         if (turn > 0) {
-            turn = 360 - turn;
+            turn = turn - 360;
         } else {
             turn = turn + 360;
         }
@@ -128,7 +133,21 @@ int moveToPoint(rover * robot1, Point dest) {
             float * lidarScan = getLiDARScan();
             float cm_right = fabs(offsetHelper(lidarScan, 60, 0, EAST, 1));
             float cm_left = fabs(offsetHelper(lidarScan, 60, 0, WEST, 1));
-            bool obstacle_a = isThereObstacle_a(lidarScan, -offset_a);
+            bool obstacle_a = false;
+            bool right_a = false;
+            bool left_a = false;
+            if (offset_a == 0) {
+                right_a = isThereObstacle_a(lidarScan, 10);
+                left_a = isThereObstacle_a(lidarScan, -10);
+                obstacle_a = (right_a && left_a);
+            } else if (abs(offset_a) < 30) {
+                if (offset_a > 0) {
+                    obstacle_a = isThereObstacle_a(lidarScan, (-1) * (int)(offset_a * 1.2 + 0.5));
+                } else {
+                    obstacle_a = isThereObstacle_a(lidarScan, (int)(offset_a * 1.2 + 0.5));
+                }
+            }
+            // add teh case where offset_a > 30;
             bool obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
 
             float extra = fabs(sin(offset_a / 180.0 * M_PI)) * 17.0;
@@ -136,11 +155,12 @@ int moveToPoint(rover * robot1, Point dest) {
             if (obstacle_r || obstacle_a) { // stopped due to obstacle
                 if (!obstacle_a || ((cm_right + extra) < 21.0 ) || ((cm_left + extra) < 21.0)) { // bot is too close to wall 
                     enum dir turn = RIGHT;
-                    if (offset_a != 0) {
-                        turn = (offset_a > 0 ) ? RIGHT : LEFT;
-                    } else {
-                        turn = (cm_right < cm_left) ? RIGHT : LEFT;
+                    if (offset == 0) {
+                        turn = (right_a) ? RIGHT : LEFT;
                     }
+                    else {
+                        turn = (offset_a > 0 ) ? RIGHT : LEFT;
+                    } 
                     getOut(*robot1, offset_a, turn);
                 } else { // we see obstacle in front, wait till obstacle disappear
                     int64_t waitTime = esp_timer_get_time();
@@ -160,7 +180,7 @@ int moveToPoint(rover * robot1, Point dest) {
             int turn = robot1->heading-angle;
             if (abs(turn) > 180) {
                 if (turn > 0) {
-                    turn = 360 - turn;
+                    turn = turn - 360;
                 } else {
                     turn = turn + 360;
                 }
