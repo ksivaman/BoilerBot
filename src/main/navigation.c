@@ -7,7 +7,6 @@ void reposition(rover * robot) {
     int angle; 
     Point curr;
     Point curr_input; 
-    enum compass currHeading = NORTH;
     
     curr = get_curr_loc(&angle, &secondClose);
     printf("curr: (%d, %d)\n", curr.x, curr.y);
