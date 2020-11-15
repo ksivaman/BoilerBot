@@ -3,38 +3,30 @@
 #include "include/navigation.h"
 
 void reposition(rover * robot) {
-    Point secondClose;
+    Point secondClose = {6,6};
     int angle; 
     Point curr;
     Point curr_input; 
     enum compass currHeading = NORTH;
-
-    // do {
-    //     curr = get_curr_loc(&angle, &secondClose);
-    //     printf("CurrLoc = (%d, %d)\n", curr.x, curr.y);
-    //     if (270 + 45 <= angle || angle < 45) {
-    //         currHeading = NORTH;
-    //     } else if (45 <= angle && angle < 180 - 45) {
-    //         currHeading = EAST;
-    //     } else if (180 - 45 <= angle && angle < 270 - 45) {
-    //         currHeading = SOUTH;
-    //     } else {
-    //         currHeading = WEST;
-    //     }
-    //     curr_input = get_curr_loc_input(currHeading, &angle, &secondClose);
-    //     printf("CurrLoc = (%d, %d)\n", curr_input.x, curr_input.y);
-
-    //     if (!isPointEqual(curr_input, curr)) {
-    //         burst_rover(*robot, 13, robot->heading);
-    //         turn_rover(*robot, 45, LEFT);
-    //     }
-    // } while (!isPointEqual(curr_input, curr));
+    
     curr = get_curr_loc(&angle, &secondClose);
+    printf("curr: (%d, %d)\n", curr.x, curr.y);
+    if (!isPointEqual(robot->currLoc, secondClose)) { // when it is not boot up initialization
+        if (!isPointEqual(curr, robot->currLoc)) {
+            curr = get_curr_loc(&angle, &secondClose);
+        }
+    }
 
     printf("angle is %d\n", angle);
 
     int turn = robot->heading-angle;
-    if (abs(turn) > 180) turn = 360 - turn;
+    if (abs(turn) > 180) {
+        if (turn > 0) {
+            turn = 360 - turn;
+        } else {
+            turn = turn + 360;
+        }
+    }
     printf("__________ Correcting turn by %d degrees\n", turn);
     if (abs(turn) > 2 ) turn_rover(*robot, turn, RIGHT);
     adjustHeading(*robot);
@@ -134,17 +126,35 @@ void moveToPoint(rover * robot1, Point dest) {
             
             int offset_a = getAngleOffset(*robot1);
             float * lidarScan = getLiDARScan();
-            float cm_right = fabs(offsetHelper(lidarScan, 30, 0, EAST, 1));
-            float cm_left = fabs(offsetHelper(lidarScan, 30, 0, WEST, 1));
-            bool obstacle_s = isThereObstacle_s(lidarScan, 0, FORWARD);
+            float cm_right = fabs(offsetHelper(lidarScan, 60, 0, EAST, 1));
+            float cm_left = fabs(offsetHelper(lidarScan, 60, 0, WEST, 1));
+            bool obstacle_a = isThereObstacle_a(lidarScan, -offset_a);
             bool obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
 
             float extra = fabs(sin(offset_a / 180.0 * M_PI)) * 17.0;
             
-            if (obstacle_r || obstacle_s) { // stopped due to obstacle
-                if (!obstacle_s && (((cm_right + extra) < 19.0 ) || ((cm_left + extra) < 19.0))) { // bot is too close to wall 
-                    getOut(*robot1, offset_a, (cm_right < cm_left) ? RIGHT : LEFT);
+            if (obstacle_r || obstacle_a) { // stopped due to obstacle
+                if (!obstacle_a || ((cm_right + extra) < 21.0 ) || ((cm_left + extra) < 21.0)) { // bot is too close to wall 
+                    enum dir turn = RIGHT;
+                    if (offset_a != 0) {
+                        turn = (offset_a > 0 ) ? RIGHT : LEFT;
+                    } else {
+                        turn = (cm_right < cm_left) ? RIGHT : LEFT;
+                    }
+                    getOut(*robot1, offset_a, turn);
                 } else { // we see obstacle in front, wait till obstacle disappear
+                    int64_t waitTime = esp_timer_get_time();
+                    int64_t newTime = esp_timer_get_time(); 
+
+                    while(obstacle_r && ((double)(newTime - waitTime) < (double) OBSTACLE_WAIT_DURATION)) {
+                        updateLiDARScan(lidarScan);
+                        obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
+                        newTime = esp_timer_get_time();   
+                    }
+                    if ((float)(newTime - waitTime) >= (float) OBSTACLE_WAIT_DURATION) {
+                        getOut(*robot1, offset_a, (cm_right < cm_left) ? RIGHT : LEFT);
+                    }
+
                     while(obstacle_r) {
                         updateLiDARScan(lidarScan);
                         obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
@@ -179,11 +189,11 @@ void moveToPoint(rover * robot1, Point dest) {
 
 // need the currLoc of robot to be accurate
 void adjustHeading(rover robot) {
-    int angle = getAngleOffset(robot);
-    printf("__________ Correcting turn by %d degrees\n", angle);
-    if (abs(angle) > 2 ){
-        printf("__________ Correcting turn by %d degrees\n", angle);
-        turn_rover(robot, angle , RIGHT);
+    int angleOffset = getAngleOffset(robot);
+    printf("__________ Correcting turn by %d degrees\n", angleOffset);
+    if (abs(angleOffset) > 2 ){
+        printf("__________ Correcting turn by %d degrees\n", angleOffset);
+        turn_rover(robot, -angleOffset , RIGHT);
     }
 }
 
@@ -319,7 +329,7 @@ void navigate(rover * robot, Point dest) {
     printf("Start: (%d, %d); End: (%d, %d)\n", robot->currLoc.x, robot->currLoc.y, dest.x, dest.y);
     printPath(path);
 
-    while(isPointEqual(robot->currLoc, dest)) {
+    while(!isPointEqual(robot->currLoc, dest)) {
         int turnAngle = getTurnAngle(path, &(robot->heading));
         printf("__________ Turning %d degrees\n", turnAngle);
         turn_rover(*robot, turnAngle, RIGHT);

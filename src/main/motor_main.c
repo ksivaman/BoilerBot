@@ -56,7 +56,7 @@
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IN_1) | (1ULL<<GPIO_OUTPUT_IN_2) | (1ULL<<GPIO_OUTPUT_IN_3) | (1ULL<<GPIO_OUTPUT_IN_4))
 
 #define MM_PER_SEC (768)
-#define DEGREE_PER_SEC_FAST (2870) //(3072)
+#define DEGREE_PER_SEC_FAST (2830) //(3072)
 #define DEGREE_PER_SEC_SLOW (2300) //(2560)
 #define DEGREE_PER_SEC_2 (2048) //(3584)
 #define HOPES 850
@@ -143,7 +143,7 @@ int getBurstTime(int cm, int *remain) {
 #define MOVE_FIRST_BOUND 8.5
 #define MOVE_SECOND_BOUND 4.25
 #define OBJECT_TOLERANCE 0 //mm
-#define OBSTACLE_WAIT_DURATION 5000000 //us
+#define OBSTACLE_WAIT_DURATION 7000000 //us
 
 float burst_rover(rover robot, int cm, enum compass heading) {
     // Determine wheather to move front or back
@@ -186,7 +186,6 @@ float burst_rover(rover robot, int cm, enum compass heading) {
     }
     printf("burst_rover(): No Obstacle, starting to move\n");
 
-    
 
     // Internal loop to move requested distance
     while ((distanceMoved < requestedDist) && (fabs(distanceMoved - requestedDist) > 2.3)) {
@@ -239,8 +238,8 @@ float burst_rover(rover robot, int cm, enum compass heading) {
             printf("run_motor(): Stopped\n");
 
             if (remain > OBSTACLE_FREE_BOUND) {
-                lidarScan = getLiDARScan();
-                obstacleFlag = isThereObstacle_r(lidarScan, 0, direction);
+                // lidarScan = getLiDARScan();
+                // obstacleFlag = isThereObstacle_r(lidarScan, 0, direction);
                 if (!obstacleFlag) {
                     printf("burst_rover(): Remain big Enough\n");
                     time_run = getBurstTime(remain, &remain);

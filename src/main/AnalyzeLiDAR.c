@@ -465,13 +465,13 @@ float getBackDist(float* procScanSamp) {
 
 bool isThereObstacle_s(float* procScanSamp, int tolerance, enum dir direction) {
     int count = 0;
-    int start_idx = FINAL_NUM_POINTS - END_ANGLE_S;
-    int idx = start_idx;
+    int start_idx = FINAL_NUM_POINTS - END_ANGLE_R;
     int offset = (direction == FORWARD) ? 0: 180;
+    int idx = (start_idx + offset) % 360;
     int j = 0;
     int prev_j = -2;
     while (j <= OBJECT_RANGE_S) {
-        if ((procScanSamp[idx + offset] > 10) && (procScanSamp[idx + offset] - object_limit_s[j]) < tolerance) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_s[j]) < tolerance) {
             if ((prev_j - j + 1) < 5) count++;
             else count = 0;
             prev_j = j;
@@ -481,7 +481,7 @@ bool isThereObstacle_s(float* procScanSamp, int tolerance, enum dir direction) {
             }      
         }
         j++;
-        idx = (start_idx + j) % 360;
+        idx = (start_idx + j + offset) % 360;
     }
 
     return false;
@@ -491,12 +491,12 @@ bool isThereObstacle_r(float* procScanSamp, int tolerance, enum dir direction) {
     int count = 0;
 
     int start_idx = FINAL_NUM_POINTS - END_ANGLE_R;
-    int idx = start_idx;
     int offset = (direction == FORWARD) ? 0: 180;
+    int idx = (start_idx + offset) % 360;
     int j = 0;
     int prev_j = -2;
     while (j <= OBJECT_RANGE_R) {
-        if ((procScanSamp[idx + offset] > 10) && (procScanSamp[idx + offset] - object_limit_r[j]) < tolerance) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < tolerance) {
             if ((prev_j - j + 1) < 5) count++;
             else count = 0;
             prev_j = j;
@@ -506,7 +506,31 @@ bool isThereObstacle_r(float* procScanSamp, int tolerance, enum dir direction) {
             }      
         }
         j++;
-        idx = (start_idx + j) % 360;
+        idx = (start_idx + j + offset) % 360;
+    }
+
+    return false;
+}
+
+bool isThereObstacle_a(float* procScanSamp, int offset) {
+    int count = 0;
+
+    int start_idx = FINAL_NUM_POINTS - END_ANGLE_R;
+    int idx = (start_idx + offset) % 360;
+    int j = 0;
+    int prev_j = -2;
+    while (j <= OBJECT_RANGE_R) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < -50) {
+            if ((prev_j - j + 1) < 5) count++;
+            else count = 0;
+            prev_j = j;
+            // printf("At Angle = %d, distance is %f\n", idx, procScanSamp[idx + offset]);
+            if (count > 2) {
+                return true;
+            }      
+        }
+        j++;
+        idx = (start_idx + j + offset) % 360;
     }
 
     return false;
