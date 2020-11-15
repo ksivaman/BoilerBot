@@ -346,7 +346,7 @@ float getDistHelper(float * proScanSamp, int refAngle) {
 }
 
 #define CONVERGENCE 15 //mm
-#define NUM_CONV 2
+#define NUM_CONV 1 // 2
 void getFrontBackDist(float * frontFinal, float *backFinal) {
     // int convergence = NUM_CONV;
     int conv_front = NUM_CONV, conv_back = NUM_CONV;
@@ -390,7 +390,7 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
         toggle = -1*toggle;
     } while (conv_front && conv_back);
     
-    int one_more_chance = 1;
+    int one_more_chance = 0; //1
     if (conv_back) {
         do {
             toggle = -1*toggle;
