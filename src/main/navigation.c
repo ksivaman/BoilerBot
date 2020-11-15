@@ -13,13 +13,14 @@ void reposition(rover * robot) {
     printf("curr: (%d, %d)\n", curr.x, curr.y);
     if (!isPointEqual(robot->currLoc, secondClose)) { // when it is not boot up initialization
         if (!isPointEqual(curr, robot->currLoc)) {
+            vTaskDelay(1000/ portTICK_PERIOD_MS);
             curr = get_curr_loc(&angle, &secondClose);
         }
     }
 
     printf("angle is %d\n", angle);
 
-    int turn = robot->heading-angle;
+    int turn = robot->heading - angle;
     if (abs(turn) > 180) {
         if (turn > 0) {
             turn = 360 - turn;
@@ -154,14 +155,24 @@ void moveToPoint(rover * robot1, Point dest) {
                     if ((float)(newTime - waitTime) >= (float) OBSTACLE_WAIT_DURATION) {
                         getOut(*robot1, offset_a, (cm_right < cm_left) ? RIGHT : LEFT);
                     }
-
-                    while(obstacle_r) {
-                        updateLiDARScan(lidarScan);
-                        obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
-                    }
                 }
             }
             robot1->currLoc = get_curr_loc_input(robot1->heading, &angle, &secondClose);
+            int turn = robot1->heading-angle;
+            if (abs(turn) > 180) {
+                if (turn > 0) {
+                    turn = 360 - turn;
+                } else {
+                    turn = turn + 360;
+                }
+            }
+            if (abs(turn) > 30 ) {
+                turn_rover(*robot1, turn, RIGHT);
+                adjustHeading(*robot1);
+            } else if (abs(turn) > 3) {
+                adjustHeading(*robot1);
+            }
+            
         }   
 
         if (robot1->heading == EAST || robot1->heading == WEST) {
