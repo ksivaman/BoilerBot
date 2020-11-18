@@ -6,7 +6,7 @@
 #define NUM_SAMPLES 400
 
 #define FRONT_SCAN_WIDTH 450.0 //mm
-#define SEARCH_DEGREE_RANGE 45 //45
+#define SEARCH_DEGREE_RANGE 90 //45
 #define SIMILAR_THRESH 60000
 
 #define SQUARE_WIDTH 85.0 // cm

@@ -104,9 +104,9 @@ void toggleMotor(ledc_channel_config_t channel, int speed) {
 }
 
 
-void backOff(rover robot) {
+void backOff(rover robot, int time_run) {
     ledc_channel_config_t channel = robot.pwm;
-    int time_run = 586; // 4.25cm MOVE_SECOND_BOUND
+    // int time_run = 586; // 4.25cm MOVE_SECOND_BOUND
 
     motor_backward(robot);
     toggleMotor(channel, MM_PER_SEC);
@@ -135,7 +135,7 @@ int getBurstTime(int cm, int *remain) {
     } else if (cm <= 268) { runTime = 6400; cm -= 237;
     } else { runTime = 7000; cm -= 268;
     }
-    *remain = cm + 5;
+    *remain = cm;
     return runTime;
 }
 
@@ -162,27 +162,35 @@ float burst_rover(rover robot, int cm, enum compass heading) {
         motor_stop(robot);
         return 0;
     }
+    if (cm > OBSTACLE_FREE_BOUND + 7) {
+        cm -= 7;
+    }
     float distanceMoved = 0; // total distance moved
     int requestedDist = cm; // total distance requested to be moved
     float time_run;
     
     bool obstacleFlag = false;
+    bool obstacleFlag_s = false;
 
     // Get initial distance measurements
     float prevFront = -1, prevBack = -1;
     if (requestedDist > OBSTACLE_FREE_BOUND){
         getFrontBackDist(&prevFront, &prevBack);
-        if (prevBack == -1) // prevBack is more desired, so re try once more.
-            getFrontBackDist(&prevFront, &prevBack);
         printf("burst_rover(): Front = %f mm, Back = %f mm\n", prevFront, prevBack);
     }
     
     // Initial Check for Obstacles
     float* lidarScan = getLiDARScan();
-    obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? isThereObstacle_r(lidarScan, 0, direction) : isThereObstacle_s(lidarScan, 0, direction);
-    if (obstacleFlag) {
+    obstacleFlag_s = isThereObstacle_r(lidarScan, 0, direction);
+    // obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? isThereObstacle_r(lidarScan, 0, direction) : isThereObstacle_s(lidarScan, 0, direction);
+    if (obstacleFlag_s && (cm > OBSTACLE_FREE_BOUND)) {
         free(lidarScan);
         return -1;
+    } else {
+        if (isThereObstacle_s(lidarScan, 0, direction)) {
+            free(lidarScan);
+            return -1;
+        }
     }
     printf("burst_rover(): No Obstacle, starting to move\n");
 
@@ -191,7 +199,7 @@ float burst_rover(rover robot, int cm, enum compass heading) {
     while ((distanceMoved < requestedDist) && (fabs(distanceMoved - requestedDist) > 2.3)) {
         int remain = 0;
         if (cm > OBSTACLE_FREE_BOUND) {
-            time_run = getBurstTime(cm - 5, &remain);
+            time_run = getBurstTime(cm, &remain);
         } else if (cm > MOVE_FIRST_BOUND) {
             time_run = 486; // 8.5cm MOVE_FIRST_BOUND
         } else {
@@ -269,20 +277,14 @@ float burst_rover(rover robot, int cm, enum compass heading) {
 
             // Case when distance cannot be calculated
             if (prevFront == -1 && newBack == -1) { // try one more scan
-                getFrontBackDist(&newFront, &newBack);
-                if (newBack == -1) {
-                    free(lidarScan);
-                    printf("here 1\n");
-                    return -1;
-                }
+                free(lidarScan);
+                printf("here 1\n");
+                return -1;
             }
             if (prevBack == -1 && newFront == -1) { // try one more scan
-                getFrontBackDist(&newFront, &newBack);
-                if (newFront == -1) {
-                    free(lidarScan);
-                    printf("here 2\n");
-                    return -1;         
-                }
+                free(lidarScan);
+                printf("here 2\n");
+                return -1;         
             }
             // Now at least one of them are ok
             
@@ -350,14 +352,18 @@ float burst_rover(rover robot, int cm, enum compass heading) {
         printf("delat: %f\n", delta);;
         distanceMoved += (delta);
         
+        bool movedLot = cm > OBSTACLE_FREE_BOUND;
         // cm = cm - distanceMoved;
         cm = cm - delta;
-
-        updateLiDARScan(lidarScan);
-        obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? isThereObstacle_r(lidarScan, 0, direction) : isThereObstacle_s(lidarScan, 0, direction);
-        if (obstacleFlag) {
-            free(lidarScan);
-            return -1;
+        
+        if (cm > OBSTACLE_FREE_BOUND || obstacleFlag_s || movedLot) {
+            updateLiDARScan(lidarScan);
+            obstacleFlag_s = isThereObstacle_r(lidarScan, 0, direction);
+            obstacleFlag = (cm > OBSTACLE_FREE_BOUND) ? obstacleFlag_s : isThereObstacle_s(lidarScan, 0, direction);
+            if (obstacleFlag) {
+                free(lidarScan);
+                return -1;
+            }
         }
         // Continue unless there is obstacle in short-range;
     }

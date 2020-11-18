@@ -243,8 +243,8 @@ Point getCurrLoc() {
 
     // Stats for initialization scan best match
     int minDiff = INT_MAX;
-    int final_angle = 0;
-    int minAngle = 0;
+    // int final_angle = 0;
+    // int minAngle = 0;
 
     char bestMatchID = 0;
     
@@ -258,7 +258,7 @@ Point getCurrLoc() {
         }
         
         int minDiffForCurrInitScan = INT_MAX;
-        minAngle = 0;
+        // minAngle = 0;
 
         // Compare current quantized scan with quantized initialization scan
         // Outer for loop: Accounts for bot not facing directly north (simulates angle alignment by altering the current scan's 0-degree-index)
@@ -271,13 +271,13 @@ Point getCurrLoc() {
             }
             if(diff < minDiffForCurrInitScan) {
                 minDiffForCurrInitScan = diff;
-                minAngle = zeroDegIdx;
+                // minAngle = zeroDegIdx;
             }
         }
         if(minDiffForCurrInitScan < minDiff) {
             minDiff = minDiffForCurrInitScan;
             bestMatchID = initScanID;
-            final_angle = 360 - minAngle;
+            // final_angle = 360 - minAngle;
             
         }
         // printf("\nDiff for (%d, %d): %d\n", initScanID / NCOLS, initScanID % NCOLS, minDiffForCurrInitScan);
@@ -346,7 +346,7 @@ float getDistHelper(float * proScanSamp, int refAngle) {
 }
 
 #define CONVERGENCE 15 //mm
-#define NUM_CONV 1 // 2
+#define NUM_CONV 2 // 2
 void getFrontBackDist(float * frontFinal, float *backFinal) {
     // int convergence = NUM_CONV;
     int conv_front = NUM_CONV, conv_back = NUM_CONV;
@@ -357,9 +357,7 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
     float * lidarScan = getLiDARScan();
     origFront = getDistHelper(lidarScan, 0);
     origBack = getDistHelper(lidarScan, 180);
-    updateLiDARScan(lidarScan);
-    newFront = getDistHelper(lidarScan, 0);
-    newBack = getDistHelper(lidarScan, 180);
+    
 
     int toggle = 1;
 
@@ -367,6 +365,9 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
     // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
 
     do {
+        updateLiDARScan(lidarScan);
+        newFront = getDistHelper(lidarScan, 0);
+        newBack = getDistHelper(lidarScan, 180);
         frontDev += toggle * (origFront - newFront);
         backDev += toggle * (origBack - newBack);
         if (frontDev < CONVERGENCE) conv_front--;
@@ -381,18 +382,16 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
             origBack = newBack;
             backDev = 0;
         }
-        updateLiDARScan(lidarScan);
-        newFront = getDistHelper(lidarScan, 0);
-        newBack = getDistHelper(lidarScan, 180);
         // printf("OrigFront: %f ?= newFront: %f\n", origFront, newFront);
         // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
-        
         toggle = -1*toggle;
     } while (conv_front && conv_back);
     
-    int one_more_chance = 0; //1
+    int one_more_chance = 1;
     if (conv_back) {
         do {
+            updateLiDARScan(lidarScan);
+            newBack = getDistHelper(lidarScan, 180);
             toggle = -1*toggle;
             backDev += toggle * (origBack - newBack);
             if (backDev < CONVERGENCE) conv_back--;
@@ -401,12 +400,12 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
                 origBack = newBack;
                 backDev = 0;
             }
-            updateLiDARScan(lidarScan);
-            newBack = getDistHelper(lidarScan, 180);
             // printf("OrigBack: %f ?= newBack: %f\n", origBack, newBack);
         } while (--one_more_chance && conv_back); 
     } else if (conv_front) {
         do {
+            updateLiDARScan(lidarScan);
+            newFront = getDistHelper(lidarScan, 0);
             toggle = -1*toggle;
             frontDev += toggle * (origFront - newFront);
             if (frontDev < CONVERGENCE) conv_front--;
@@ -415,8 +414,6 @@ void getFrontBackDist(float * frontFinal, float *backFinal) {
                 origFront = newFront;
                 frontDev = 0;
             }
-            updateLiDARScan(lidarScan);
-            newFront = getDistHelper(lidarScan, 0);
             // printf("OrigFront: %f ?= newFront: %f\n", origFront, newFront);
         } while (--one_more_chance && conv_front);
     }
@@ -438,30 +435,6 @@ float getBackDist(float* procScanSamp) {
 
     return getDistHelper(procScanSamp, 180);
 }
-
-// bool doINeedToStop(float* procScanSamp, float prevFront, float prevBack, int cm, bool* obstacleFlag, bool* distanceDoneFlag) {
-//     // OPTIMIZED VERSION (using Object_limit[OBJECT_RANGE])
-//     int count = 0;
-//     int shift = FINAL_NUM_POINTS - END_ANGLE_R;
-//     for(int i = 0; i <= END_ANGLE_R; i++) {
-//         if ((procScanSamp[i] > 10) && (procScanSamp[i] - object_limit_r[i]) < 0) {
-//             count++;
-//             if (count > 10) {
-//                 return true;
-//             }      
-//         }
-//     }
-//     for(int i = 0; i < END_ANGLE_R; i++) {
-//         if ((procScanSamp[i] > 10) && (procScanSamp[i + shift] - object_limit_r[i + END_ANGLE_R + 1]) < 0) {
-//             count++;
-//             if (count > 10) {
-//                 return true;
-//             }
-//         }
-//     }
-    
-//     return false;
-// }
 
 bool isThereObstacle_s(float* procScanSamp, int tolerance, enum dir direction) {
     int count = 0;
@@ -520,7 +493,7 @@ bool isThereObstacle_a(float* procScanSamp, int offset) {
     int j = 0;
     int prev_j = -2;
     while (j <= OBJECT_RANGE_R) {
-        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_r[j]) < -100) {
+        if ((procScanSamp[idx] > 10) && (procScanSamp[idx] - object_limit_s[j]) < 0) {
             if ((prev_j - j + 1) < 5) count++;
             else count = 0;
             prev_j = j;
@@ -577,441 +550,6 @@ int absoluteErrorFrom(float * procScanSamp, Point p, int * angle) {
 
     return minDiffForCurrInitScan;
 }
-
-
-// int float_comparator(const void *a, const void *b)
-// {
-//     float aa = *(float*)a, bb = *(float*)b;
-   
-//     if (aa > bb) return -1;
-//     if (aa < bb) return 1;
-//     return 0;
-// }
-
-// float getVerticalOffset(float * procScanSamp, Point p, int zeroDegIdx, int front) {
-//     float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     float refDist;
-//     if (front) refDist = procScanSamp[(0 + zeroDegIdx) % FINAL_NUM_POINTS];
-//     else refDist = procScanSamp[(180 + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-//     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-
-//     int angle_start;
-//     if (front) angle_start = 360 - (range) / 2;
-//     else angle_start = 180 - (range) / 2;
-
-//     int j = 0;
-//     while (j < range) {
-//         float coeff = cos(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//         deltaDist[j] = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//         deltaDist[j] -= coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//         j++;
-//     }
-//     qsort(deltaDist, range, sizeof(float), float_comparator);
-
-//     // filter outliers (prob by obsticles)
-//     int minimun = deltaDist[0];
-//     for (j = 0; j < range; j++) {
-//         if (abs(deltaDist[j] - minimun) <= DEV_THRESHOLD) {
-//             sum += deltaDist[j];
-//             dev++;
-//         }
-//     }
-
-//     return roundf(sum / dev);
-// }
-
-// // zeroDegIdx = value to be added into index so it will match up with pre-scan data.
-// float getHorizontalOffset(float * procScanSamp, Point p, int zeroDegIdx, int right) {
-//     float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     float refDist;
-//     if (right) refDist = procScanSamp[(90 + zeroDegIdx) % FINAL_NUM_POINTS];
-//     else refDist = procScanSamp[(270 + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-//     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-
-//     int angle_start;
-//     if (right) angle_start = 90 - (range) / 2;
-//     else angle_start = 270 - (range) / 2;
-    
-//     int j = 0;
-//     while (j < range) {
-//         float coeff = sin(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//         deltaDist[j] = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//         deltaDist[j] -= coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//         j++;
-//     }
-//     qsort(deltaDist, range, sizeof(float), float_comparator);
-
-//     // filter outliers (prob by obsticles)
-//     int minimun = deltaDist[0];
-//     for (j = 0; j < range; j++) {
-//         if (abs(deltaDist[j] - minimun) <= DEV_THRESHOLD) {
-//             sum += deltaDist[j];
-//             dev++;
-//         }
-//     }
-
-//     return roundf(sum / dev);
-// }
-
-// zeroDegIdx = value to be added into index so it will match up with pre-scan data.
-// float getNorthOffset(float * procScanSamp, Point p, int zeroDegIdx, enum compass direction) {
-//     // float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-//     float distance[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     float refDist = lidar_data[p.x][p.y][direction];
-//     // float refDist = procScanSamp[(direction + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-//     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-//     // int range = 90;
-//     int angle_start = (direction - (range / 2) + 360) % FINAL_NUM_POINTS;
-
-//     // distance from Original
-//     int j = 0;
-//     float minDist = __FLT_MAX__;
-//     float max = 0;
-//     float curr = 0;
-//     while (j < range) {
-//         if (lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = cos(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-        
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float origDist = round(sum / dev); // mm
-//     // float origDist = max;
-
-//     // newMeasurements
-//     j = 0;
-//     sum = 0;
-//     dev = 0;
-//     max = 0;
-//     minDist = __FLT_MAX__;
-//     curr = 0;
-//     while (j < range) {
-//         if (procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = cos(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//             if (fabs(curr) > max) {
-//                 max = fabs(curr);
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float newDist = round(sum / dev); // mm
-//     // float newDist = max;
-
-
-//     return origDist - newDist;
-
-
-//     // while (j < range) {
-//     //     float coeff = cos(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//     //     deltaDist[j] = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//     //     deltaDist[j] -= coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//     //     j++;
-//     // }
-//     // qsort(deltaDist, range, sizeof(float), float_comparator);
-
-//     // // filter outliers (prob by obsticles)
-//     // int minimun = deltaDist[0];
-//     // for (j = 0; j < range; j++) {
-//     //     if (abs(deltaDist[j] - minimun) <= DEV_THRESHOLD) {
-//     //         sum += deltaDist[j];
-//     //         dev++;
-//     //     }
-//     // }
-
-//     // return roundf(sum / dev);
-// }
-
-// // zeroDegIdx = value to be added into index so it will match up with pre-scan data.
-// // float getNorthOffset(float * procScanSamp, Point p, int zeroDegIdx, enum compass direction) {
-// //     float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-// //     float sum = 0;
-// //     int dev = 0;
-// //     float refDist = procScanSamp[(direction + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-// //     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-// //     // int range = 90;
-// //     int angle_start = (direction - (range) / 2) % FINAL_NUM_POINTS;
-
-// //     int j = 0;
-// //     while (j < range) {
-// //         float coeff = cos(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-// //         deltaDist[j] = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-// //         deltaDist[j] -= coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//         j++;
-//     }
-//     qsort(deltaDist, range, sizeof(float), float_comparator);
-
-//     // filter outliers (prob by obsticles)
-//     int minimun = deltaDist[0];
-//     for (j = 0; j < range; j++) {
-//         if (abs(deltaDist[j] - minimun) <= DEV_THRESHOLD) {
-//             sum += deltaDist[j];
-//             dev++;
-//         }
-//     }
-
-//     return roundf(sum / dev);
-// }
-
-// float getEastOffset(float * procScanSamp, Point p, int zeroDegIdx, enum compass direction) {
-//     // float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-//     float distance[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     float refDist = lidar_data[p.x][p.y][direction]
-//     // float refDist = procScanSamp[(direction + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-//     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-//     // int range = 30;
-//     int angle_start = (direction - (range) / 2) % FINAL_NUM_POINTS;
-    
-
-//     // distance from Original
-//     int j = 0;
-//     float minDist = __FLT_MAX__;
-//     float max = 0;
-//     float curr = 0;
-//     while (j < range) {
-//         if (lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = sin(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float origDist = round(sum / dev); // mm
-//     // float origDist = max;
-
-//     // newMeasurements
-//     j = 0;
-//     sum = 0;
-//     dev = 0;
-//     minDist = __FLT_MAX__;
-//     curr = 0;
-//     max = -1;
-//     while (j < range) {
-//         if (procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = sin(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//             if (fabs(curr) > max) {
-//                 max = fabs(curr);
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float newDist = round(sum / dev); // mm
-//     // float newDist = max;
-
-//     return origDist - newDist;
-// }
-
-// float currentEWNS(float * procScanSamp, enum compass direction, int range) {
-//     float distance[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     int angle_start = (direction - (range) / 2) % FINAL_NUM_POINTS;
-
-// }
-
-
-// float getEastOffset(float * procScanSamp, Point p, int zeroDegIdx, enum compass direction) {
-//     // float deltaDist[FINAL_NUM_POINTS / 2] = {0};
-//     float distance[FINAL_NUM_POINTS / 2] = {0};
-//     float sum = 0;
-//     int dev = 0;
-//     float refDist = lidar_data[p.x][p.y][direction];
-//     // float refDist = procScanSamp[(direction + zeroDegIdx) % FINAL_NUM_POINTS];
-    
-//     int range = (int) ((atan2(ROBOT_LENGTH / 2, refDist) * 180 / M_PI) + 0.5);
-//     // int range = 30;
-//     int angle_start = (direction - (range / 2) + 360) % FINAL_NUM_POINTS;
-    
-
-//     // distance from Original
-//     int j = 0;
-//     float minDist = __FLT_MAX__;
-//     float max = 0;
-//     float curr = 0;
-//     while (j < range) {
-//         if (lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = sin(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * lidar_data[p.x][p.y][(angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float origDist = round(sum / dev); // mm
-//     // float origDist = max;
-
-//     // newMeasurements
-//     j = 0;
-//     sum = 0;
-//     dev = 0;
-//     minDist = __FLT_MAX__;
-//     curr = 0;
-//     max = -1;
-//     while (j < range) {
-//         if (procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS] > 10) {
-//             float coeff = sin(((angle_start + j) % FINAL_NUM_POINTS) / 180.0 * M_PI);
-//             curr = coeff * procScanSamp[(zeroDegIdx + angle_start + j) % FINAL_NUM_POINTS];
-//             distance[j] = curr;
-//             if (curr < minDist) {
-//                 minDist = curr;
-//             }
-//             if (fabs(curr) > max) {
-//                 max = fabs(curr);
-//             }
-//         } else {
-//             distance[j] = 0;
-//         }
-//         j++;
-//     }
-
-//     j = 0;
-//     while (j < range) {
-//         if (fabs(distance[j] - minDist) < 15) {
-//             sum += distance[j];
-//             dev++;
-//         }
-//         j++;
-//     }
-
-//     float newDist = round(sum / dev); // mm
-//     // float newDist = max;
-
-//     return origDist - newDist;
-// }
-
-// Assume we are facing North, right (east) is +X for horizontal, top (north) is +Y for verticle
-// offset is not in perspective of rover, but it is absolute offset on the plane
-// void getOffSetFrom(float * procScanSamp, Point p, int * offsetNorth, int * offsetEast) {
-
-//     int zeroDegIdx = 0;
-//     absoluteErrorFrom(procScanSamp, p, &zeroDegIdx);
-//     // printf("degree = %d\n", zeroDegIdx);
-//     zeroDegIdx = 360 - zeroDegIdx;
-
-//     float northRef = procScanSamp[(NORTH + zeroDegIdx) % FINAL_NUM_POINTS];
-//     float southRef = procScanSamp[(SOUTH + zeroDegIdx) % FINAL_NUM_POINTS];
-//     float eastRef = procScanSamp[(EAST + zeroDegIdx) % FINAL_NUM_POINTS];
-//     float westRef = procScanSamp[(WEST + zeroDegIdx) % FINAL_NUM_POINTS];
-//     float deltaNorth = getNorthOffset(procScanSamp, p, zeroDegIdx, NORTH);
-//     float deltaSouth = getNorthOffset(procScanSamp, p, zeroDegIdx, SOUTH);
-//     float deltaEast = getEastOffset(procScanSamp, p, zeroDegIdx, EAST);
-//     float deltaWest = getEastOffset(procScanSamp, p, zeroDegIdx, WEST);
-
-//     // float deltaNorth = getNorthOffset(procScanSamp, p, zeroDegIdx, NORTH);
-//     // float deltaSouth = getNorthOffset(procScanSamp, p, zeroDegIdx, SOUTH);
-//     // float deltaEast = getEastOffset(procScanSamp, p, zeroDegIdx, EAST);
-//     // float deltaWest = getEastOffset(procScanSamp, p, zeroDegIdx, WEST);
-
-//     // printf("deltaNorth: %f, deltaSouth: %f\n deltaEast: %f, deltaWest: %f\n", deltaNorth, deltaSouth, deltaEast, deltaWest);
-
-//     // *offsetEast = (((abs(deltaEast) < abs(deltaWest)) ? round(deltaEast) : round(deltaWest)) + 0.5) / 10;
-//     // *offsetNorth = (((abs(deltaNorth) < abs(deltaSouth)) ? round(deltaNorth) : round(deltaSouth)) + 0.5) / 10;
-
-
-//     if (abs(deltaEast - deltaWest) > 20) {
-//         *offsetEast = (((abs(deltaEast) < abs(deltaWest))? round(deltaEast) : round(deltaWest)) + 0.5) / 10;
-//     } else {
-//         *offsetEast = (((abs(eastRef) < abs(westRef))? round(deltaEast) : round(deltaWest)) + 0.5) / 10;
-//     }
-
-//     if (abs(deltaNorth - deltaSouth) > 20) {
-//         *offsetNorth = (((abs(deltaNorth) < abs(deltaSouth))? round(deltaNorth) : round(deltaSouth)) +0.5) / 10;
-//     } else {
-//         *offsetNorth = (((abs(northRef) < abs(southRef))? round(deltaNorth) : round(deltaSouth)) + 0.5) / 10;
-//     }
-// }
 
 // mode 0: finding max mode, mode 1: finding min
 float offsetHelper(float * lidarScan, int range, int zeroDegIdx, enum compass direction, bool mode) {
@@ -1112,14 +650,16 @@ void getOffsets(rover robot, int *offsetNorth, int * offsetEast) {
     e_0  = offsetHelper(lidarScan, e_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), EAST, 0);
     w_0  = offsetHelper(lidarScan, w_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), WEST, 0);
     // printf("North: %f, South: %f, East: %f, West: %f\n", n_0, s_0, e_0, w_0);
-    updateLiDARScan(lidarScan);
-    n_1 = offsetHelper(lidarScan, n_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), NORTH, 0);
-    s_1 = offsetHelper(lidarScan, s_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), SOUTH, 0);
-    e_1 = offsetHelper(lidarScan, e_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), EAST, 0);
-    w_1 = offsetHelper(lidarScan, w_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), WEST, 0);
+    
     // printf("North: %f, South: %f, East: %f, West: %f\n", n_1, s_1, e_1, w_1);
 
+    int giveup = 6;
     do {
+        updateLiDARScan(lidarScan);
+        n_1 = offsetHelper(lidarScan, n_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), NORTH, 0);
+        s_1 = offsetHelper(lidarScan, s_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), SOUTH, 0);
+        e_1 = offsetHelper(lidarScan, e_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), EAST, 0);
+        w_1 = offsetHelper(lidarScan, w_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), WEST, 0);
         if (conv_n) {
             if (abs(n_0 - n_1 + 0.5) < 4) conv_n--;
             else { conv_n = NUM_CONV_OFFSET; n_0 = n_1;
@@ -1140,21 +680,33 @@ void getOffsets(rover robot, int *offsetNorth, int * offsetEast) {
             else { conv_w = NUM_CONV_OFFSET; w_0 = w_1;
             }
         }
-        updateLiDARScan(lidarScan);
-        n_1 = offsetHelper(lidarScan, n_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), NORTH, 0);
-        s_1 = offsetHelper(lidarScan, s_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), SOUTH, 0);
-        e_1 = offsetHelper(lidarScan, e_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), EAST, 0);
-        w_1 = offsetHelper(lidarScan, w_range, FINAL_NUM_POINTS - (robot.heading + angleOffset), WEST, 0);
-        // printf("North: %f, South: %f, East: %f, West: %f\n", n_1, s_1, e_1, w_1);
-    } while ((robot.heading == NORTH || robot.heading == SOUTH) ? (conv_n || conv_s) : (conv_e || conv_w));
+        printf("North: %f, South: %f, East: %f, West: %f\n", n_1, s_1, e_1, w_1);
+    } while (((robot.heading == NORTH || robot.heading == SOUTH) ? (conv_n || conv_s) : (conv_e || conv_w)) && giveup--);
 
     free(lidarScan);
+
+    
     ///////////////////////////////////////////////////////////////////////////////////
 
     int delat_n = (n_orig - n_1) + 0.5;
     int delat_s = (s_orig - s_1) + 0.5;
     int delat_e = (e_orig - e_1) + 0.5;
     int delat_w = (w_orig - w_1) + 0.5;
+
+    if (giveup == 0) {
+        if (conv_e == 0) {
+            *offsetEast = delat_e;
+        }
+        if (conv_w == 0) {
+            *offsetEast = delat_w;
+        }
+        if (conv_n == 0) {
+            *offsetNorth = delat_n;
+        }  
+        if (conv_s == 0) {
+            *offsetNorth = delat_s;
+        }  
+    }
 
     // printf("deltaNorth: %d, deltaSouth: %d, deltaEast: %d, deltaWest: %d\n", delat_n, delat_s, delat_e, delat_w);
 
@@ -1179,9 +731,9 @@ int angleOffsetHelper(float * lidarScan, int range, enum compass direction) {
     int angle_start = (direction - (range / 2) + FINAL_NUM_POINTS) % FINAL_NUM_POINTS;
 
     int j = 0;
-    float minDist = __FLT_MAX__;
+    // float minDist = __FLT_MAX__;
     // float max = 0;
-    float curr = 0;
+    // float curr = 0;
     float coeff_sin = 0;
     float coeff_cos = 0;
     while (j < range) {
@@ -1210,7 +762,7 @@ int angleOffsetHelper(float * lidarScan, int range, enum compass direction) {
     int maxCountStart = 0;
     float delta = 0;
     float lastDelta = 0;
-    int multiplyer = 1;
+    // int multiplyer = 1;
     
     while (j < range - 1) {
         delta = height[j] - height[j + 1];
@@ -1282,21 +834,21 @@ int getAngleOffset(rover robot) {
 
     // printf("fmin: %f, bmin: %f, rmin: %f, lmin: %f\n", f_min, b_min, r_min, l_min);
 
-    float ref = ref_f;
+    // float ref = ref_f;
     float minimum = fabs(f_min);
     enum compass direction = NORTH;
     if (b_min < minimum) {
-        ref = ref_b;
+        // ref = ref_b;
         minimum = b_min;
         direction = SOUTH;
     }
     if (r_min < minimum) {
-        ref = ref_r;
+        // ref = ref_r;
         minimum = r_min;
         direction = EAST;
     }
     if (l_min < minimum) {
-        ref = ref_l;
+        // ref = ref_l;
         minimum = l_min;
         direction = WEST;
     }
@@ -1304,7 +856,7 @@ int getAngleOffset(rover robot) {
     // get minimum of f b r l
     direction = (direction + 360 - robot.heading) % 360;
     printf("Looking at Direction: %d\n", direction);
-    int range = (int) ((atan2(ROBOT_LENGTH / 2, ref) * 180 / M_PI) + 0.5);
+    // int range = (int) ((atan2(ROBOT_LENGTH / 2, ref) * 180 / M_PI) + 0.5);
     float * lidarScan = getLiDARScan();
     int angleOffset = angleOffsetHelper(lidarScan, 45, direction);
     free(lidarScan);

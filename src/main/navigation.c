@@ -6,21 +6,24 @@ void reposition(rover * robot) {
     Point secondClose = {6,6};
     int angle; 
     Point curr;
-    Point curr_input; 
+    // Point curr_input; 
     
-    curr = get_curr_loc(&angle, &secondClose);
+    curr = get_curr_loc_input(robot->heading, &angle, &secondClose);
     printf("curr: (%d, %d)\n", curr.x, curr.y);
-    if (!isPointEqual(robot->currLoc, secondClose)) { // when it is not boot up initialization
-        if (!isPointEqual(curr, robot->currLoc)) {
-            vTaskDelay(1000/ portTICK_PERIOD_MS);
-            curr = get_curr_loc(&angle, &secondClose);
-        }
-    }
+    // if (!isPointEqual(robot->currLoc, secondClose)) { // when it is not boot up initialization
+    //     if (!isPointEqual(curr, robot->currLoc)) {
+    //         vTaskDelay(1000/ portTICK_PERIOD_MS);
+    //         curr = get_curr_loc_input(robot->heading, &angle, &secondClose);
+    //     }
+    // }
+    // char buf[20];
+    // sprintf(buf, 20, "curr_loc_%d_%d", curr.x, curr.y);
+    // prints(buf);
 
-    if (360 - 45 <= angle || angle < 90 - 45) robot->heading = NORTH;
-    else if (90 - 45 <= angle && angle < 180 - 45) robot->heading = EAST;
-    else if (180 - 45 <= angle && angle < 270 - 45) robot->heading = SOUTH;
-    else robot->heading = WEST;
+    // if (360 - 45 <= angle || angle < 90 - 45) robot->heading = NORTH;
+    // else if (90 - 45 <= angle && angle < 180 - 45) robot->heading = EAST;
+    // else if (180 - 45 <= angle && angle < 270 - 45) robot->heading = SOUTH;
+    // else robot->heading = WEST;
 
     printf("angle is %d\n", angle);
 
@@ -60,11 +63,13 @@ int getBurstLen(Point start, Point dest) {
 void getOut(rover robot1, int currAngle, enum dir direction) {
     int turned = abs(currAngle);
     int delta = 5;
-    while (turned < 30) {
+    int time_run = 586;
+    while (turned < 45) {
         turn_rover(robot1, delta, direction);
-        backOff(robot1);
+        backOff(robot1, time_run);
         turned += delta;
-        delta += 5;
+        delta += 10;
+        time_run += 10;
     }
     turn_rover(robot1, (-1) * turned, direction);
 }
@@ -76,31 +81,37 @@ void fitInSqure(rover * robot1) {
     int move = 0;
 
     getOffsets(*robot1, &offset_n, &offset_e);
-    printf("North %d, East: %d\n", offset_n, offset_e);
+    // printf("North %d, East: %d\n", offset_n, offset_e);
     if ((robot1->heading == EAST || robot1->heading == WEST)) {
-        while (abs(offset_e) > 2) {
+        while (abs(offset_e) > 3) {
             if (abs(offset_e) > OBSTACLE_FREE_BOUND) {
                 do {
                     move = OBSTACLE_FREE_BOUND;
-                    printf("move: %d\n", move);
-                    burst_rover(*robot1, move, (offset_e > 0) ? WEST : EAST);
+                    // printf("move: %d\n", move);
+                    if (burst_rover(*robot1, move, (offset_e > 0) ? WEST : EAST) == -1) {
+                        return;
+                    }
                     offset_e = (offset_e > 0) ? (offset_e - OBSTACLE_FREE_BOUND) : (offset_e + OBSTACLE_FREE_BOUND);
                 } while (abs(offset_e) > OBSTACLE_FREE_BOUND);
             }
-            burst_rover(*robot1, abs(offset_e), (offset_e > 0) ? WEST : EAST);
+            if (abs(offset_e) > 3) 
+                burst_rover(*robot1, abs(offset_e), (offset_e > 0) ? WEST : EAST);
             getOffsets(*robot1, &offset_n, &offset_e);
         }
     } else {
-        while (abs(offset_n) > 2) {
+        while (abs(offset_n) > 3) {
             if (abs(offset_n) > OBSTACLE_FREE_BOUND) {
                 do {
                     move = OBSTACLE_FREE_BOUND;
-                    printf("move: %d\n", move);
-                    burst_rover(*robot1, move, (offset_n > 0) ? SOUTH : NORTH);
+                    // printf("move: %d\n", move);
+                    if (burst_rover(*robot1, move, (offset_n > 0) ? SOUTH : NORTH) == -1) {
+                        return;
+                    }
                     offset_n = (offset_n > 0) ? (offset_n - OBSTACLE_FREE_BOUND) : (offset_n + OBSTACLE_FREE_BOUND);
                 } while (abs(offset_n) > OBSTACLE_FREE_BOUND);
             }
-            burst_rover(*robot1, abs(offset_n), (offset_n > 0) ? SOUTH : NORTH);
+            if (abs(offset_n) > 3)
+                burst_rover(*robot1, abs(offset_n), (offset_n > 0) ? SOUTH : NORTH);
             getOffsets(*robot1, &offset_n, &offset_e);
         }
     }
@@ -141,11 +152,7 @@ int moveToPoint(rover * robot1, Point dest) {
                 left_a = isThereObstacle_a(lidarScan, -10);
                 obstacle_a = (right_a && left_a);
             } else if (abs(offset_a) < 30) {
-                if (offset_a > 0) {
-                    obstacle_a = isThereObstacle_a(lidarScan, (-1) * (int)(offset_a * 1.2 + 0.5));
-                } else {
-                    obstacle_a = isThereObstacle_a(lidarScan, (int)(offset_a * 1.2 + 0.5));
-                }
+                obstacle_a = isThereObstacle_a(lidarScan, (-1) * (int)(offset_a * 1.2 + 0.5));
             }
             // add teh case where offset_a > 30;
             bool obstacle_r = isThereObstacle_r(lidarScan, 0, FORWARD);
@@ -154,12 +161,16 @@ int moveToPoint(rover * robot1, Point dest) {
             
             if (obstacle_r || obstacle_a) { // stopped due to obstacle
                 if (!obstacle_a || ((cm_right + extra) < 21.0 ) || ((cm_left + extra) < 21.0)) { // bot is too close to wall 
+                    if (isThereObstacle_r(lidarScan, 0, BACKWARD)) {
+                        free(lidarScan);
+                        return 0;
+                    }
                     enum dir turn = RIGHT;
-                    if (offset == 0) {
+                    if (offset_a == 0) {
                         turn = (right_a) ? RIGHT : LEFT;
                     }
                     else {
-                        turn = (offset_a > 0 ) ? RIGHT : LEFT;
+                        turn = (cm_right < cm_left ) ? RIGHT : LEFT;
                     } 
                     getOut(*robot1, offset_a, turn);
                 } else { // we see obstacle in front, wait till obstacle disappear
@@ -172,27 +183,32 @@ int moveToPoint(rover * robot1, Point dest) {
                         newTime = esp_timer_get_time();   
                     }
                     if ((float)(newTime - waitTime) >= (float) OBSTACLE_WAIT_DURATION) {
+                        if (isThereObstacle_r(lidarScan, 0, BACKWARD)) {
+                            free(lidarScan);
+                            return 0;
+                        }
                         getOut(*robot1, offset_a, (cm_right < cm_left) ? RIGHT : LEFT);
                     }
                 }
             }
-            robot1->currLoc = get_curr_loc_input(robot1->heading, &angle, &secondClose);
-            int turn = robot1->heading-angle;
-            if (abs(turn) > 180) {
-                if (turn > 0) {
-                    turn = turn - 360;
-                } else {
-                    turn = turn + 360;
-                }
+            free(lidarScan);
+            robot1->currLoc = get_curr_loc_input(robot1->heading, &angle, &secondClose);            
+        } 
+
+        int turn = robot1->heading-angle;
+        if (abs(turn) > 180) {
+            if (turn > 0) {
+                turn = turn - 360;
+            } else {
+                turn = turn + 360;
             }
-            if (abs(turn) > 30 ) {
-                turn_rover(*robot1, turn, RIGHT);
-                adjustHeading(*robot1);
-            } else if (abs(turn) > 3) {
-                adjustHeading(*robot1);
-            }
-            
-        }   
+        }
+        if (abs(turn) > 30 ) {
+            turn_rover(*robot1, turn, RIGHT);
+            adjustHeading(*robot1);
+        } else if (abs(turn) > 3) {
+            adjustHeading(*robot1);
+        }
 
         if (robot1->heading == EAST || robot1->heading == WEST) {
             if (robot1->currLoc.x != dest.x) {
@@ -211,6 +227,7 @@ int moveToPoint(rover * robot1, Point dest) {
                 offset = (robot1->heading == NORTH) ? (-1) * offset_n : offset_n;
             }
         }
+        adjustHeading(*robot1);
 
     } while (!isPointEqual(robot1->currLoc, dest));
     return 0;
@@ -228,7 +245,13 @@ void adjustHeading(rover robot) {
 }
 
 void navigate(rover * robot, Point dest) {
-    Path* path = getPathAStar(NROWS, NCOLS, fplan, robot->currLoc, dest);
+
+    Path* path; 
+    // int angle;
+    // Point secondClose;
+    // enum compass currHeading;
+    
+    path = getPathAStar(NROWS, NCOLS, fplan, robot->currLoc, dest);
     printf("Start: (%d, %d); End: (%d, %d)\n", robot->currLoc.x, robot->currLoc.y, dest.x, dest.y);
     printPath(path);
 
@@ -239,7 +262,7 @@ void navigate(rover * robot, Point dest) {
         turn_rover(*robot, turnAngle, RIGHT);
         adjustHeading(*robot);
 
-        Path* burstStart = path;
+        // Path* burstStart = path;
         int changeXDir = path->next->data.x - path->data.x;
         int changeYDir;
         if(changeXDir == 0) {           // If change isn't in X for current --> next, must be in Y

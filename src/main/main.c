@@ -323,14 +323,6 @@ void app_main(void) {
     printf("turningOn Lidar\n");
     init_lidar();
     // vTaskDelay(4000 / portTICK_PERIOD_MS);
-    
-    // reposition(&robot1);
-    // start.x = 1;
-    // start.y = 0;
-    // navigate(&robot1, start);
-
-    // turn_rover(robot1, -180, RIGHT);
-    // return;
 
     while(1) {
         reposition(&robot1);
