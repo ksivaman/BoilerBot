@@ -10,21 +10,6 @@ void reposition(rover * robot) {
     
     curr = get_curr_loc_input(robot->heading, &angle, &secondClose);
     printf("curr: (%d, %d)\n", curr.x, curr.y);
-    // if (!isPointEqual(robot->currLoc, secondClose)) { // when it is not boot up initialization
-    //     if (!isPointEqual(curr, robot->currLoc)) {
-    //         vTaskDelay(1000/ portTICK_PERIOD_MS);
-    //         curr = get_curr_loc_input(robot->heading, &angle, &secondClose);
-    //     }
-    // }
-    // char buf[20];
-    // sprintf(buf, 20, "curr_loc_%d_%d", curr.x, curr.y);
-    // prints(buf);
-
-    // if (360 - 45 <= angle || angle < 90 - 45) robot->heading = NORTH;
-    // else if (90 - 45 <= angle && angle < 180 - 45) robot->heading = EAST;
-    // else if (180 - 45 <= angle && angle < 270 - 45) robot->heading = SOUTH;
-    // else robot->heading = WEST;
-
     printf("angle is %d\n", angle);
 
     int turn = robot->heading - angle;
@@ -246,11 +231,7 @@ void adjustHeading(rover robot) {
 
 void navigate(rover * robot, Point dest) {
 
-    Path* path; 
-    // int angle;
-    // Point secondClose;
-    // enum compass currHeading;
-    
+    Path* path;     
     path = getPathAStar(NROWS, NCOLS, fplan, robot->currLoc, dest);
     printf("Start: (%d, %d); End: (%d, %d)\n", robot->currLoc.x, robot->currLoc.y, dest.x, dest.y);
     printPath(path);
@@ -312,131 +293,6 @@ void navigate(rover * robot, Point dest) {
     }
 }
 
-
-// void navigate(Path* pathStart, rover * robot1) {
-//     // Pointer to traverse through A* path
-//     Path* path = pathStart;
-//     enum compass * currHeading = &(robot1->heading);
-//     // Navigate until at end of A* path (when path->next == NULL)
-//     while(path->next != NULL) {
-//         // Appropriately Turn
-//         int turnAngle = getTurnAngle(path, currHeading);
-//         printf("__________ Turning %d degrees\n", turnAngle);
-//         turn_rover(*robot1, turnAngle, RIGHT);
-
-//         adjustHeading(robot1);
-//         float * newScan = getLiDARScan();
-//         int angle;
-//         absoluteErrorFrom(newScan, path->data, &angle);
-//         free(newScan);
-//         printf("__________ Correcting turn by %d degrees\n", *currHeading-angle);
-//         int subangle = 0;
-//         if (angle > 180){
-//             angle -= 360;
-//         }
-//         if (*currHeading == 270){
-//             subangle = -90;
-//         }
-//         else {
-//             subangle = *currHeading;
-//         }
-//         if (abs(subangle - angle) > 5 )
-//             turn_rover(*robot1, subangle-angle , RIGHT);
-          
-//         // Find burst direction
-//         Path* burstStart = path;
-//         // robot1->currLoc.x = path->data.x;
-//         // robot1->currLoc.y = path->data.y;
-
-//         int changeXDir = path->next->data.x - path->data.x;
-//         int changeYDir;
-//         if(changeXDir == 0) {           // If change isn't in X for current --> next, must be in Y
-//             changeYDir = path->next->data.y - path->data.y;
-//         }
-//         // Set point as next point in path (to see if pattern continues beyond 1-square burst)
-//         path = path->next;
-
-//         // Go through A* path, starting from point after our current location, to find what point the burst ends at
-//         // Checks path->next != NULL to make sure it's not at end of path
-//         while(path->next != NULL) {
-//             int newchangeDir = 0;
-//             // If moving in X direction
-//             if(changeXDir != 0) {
-//                 newchangeDir = path->next->data.x - path->data.x;
-//                 // If movement direction matches burst direction, update path
-//                 if(newchangeDir == changeXDir) {
-//                     path = path->next;
-//                 }
-//                 // If movement direction no longer matches burst direction (i.e. there's a turn)
-//                 else {
-//                     break;
-//                 }
-//             }
-//             // If moving in Y direction
-//             else {
-//                 newchangeDir = path->next->data.y - path->data.y;
-//                 // If movement direction matches burst direction, update path
-//                 if(newchangeDir == changeYDir) {
-//                     path = path->next;
-//                 }
-//                 // If movement direction no longer matches burst direction (i.e. there's a turn)
-//                 else {
-//                     break;
-//                 }
-//             }
-//         }
-//         Point burstEndPoint = path->data;
-
-//         printf("calling MovingToPoint\n");
-
-//         moveToPoint(robot1, burstEndPoint);
-
-//         // // Jin's approach
-//         // // int burstDir;
-//         // int burstLen;
-//         // // If moving in X Direction
-//         // if(changeXDir != 0) {
-//         //     burstLen = abs(burstEndPoint.x - burstStart->data.x);
-//         //     // burstDir = changeXDir > 0? NORTH : SOUTH;
-//         // }
-//         // // If moving in Y Direction
-//         // else {
-//         //     burstLen = abs(burstEndPoint.y - burstStart->data.y);
-//         //     // burstDir = changeYDir > 0? WEST : EAST;
-//         // }
-
-//         // printf("__________ Bursting %d blocks to (%d, %d)\n", burstLen, burstEndPoint.x, burstEndPoint.y);
-//         // bool obstacle = false;
-//         // // robot1->heading = *currHeading;
-//         // burst_rover(*robot1, burstLen * SQUARE_WIDTH, *currHeading, &obstacle);
-
-//         // TODO: burst(burstLen, burstEndPoint) // Pass in distance, and the final point. burst till you reach that point
-
-//         // Get current scan and quantize it
-//         // startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
-//         // while(!(IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))));
-//         // stop();
-//         // float* currScan = quantizeScan(node, NUM_SAMPLES);
-
-//         // Turn on motors
-//         // TODO: Turn on motors here
-
-//         // Go forward until burst end point reached
-//         // ******* Possible modification: subtract a distance from the burst endpoint distance measurement, in order to account for slight amount of rolling after motors stop
-//         // while(currScan[0] > lidar_data[burstEndPoint.x][burstEndPoint.y][0]) {
-//         //     // Get new quantized scan while bot is moving
-//         //     startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
-//         //     while(!(IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))));
-//         //     stop();
-//         //     currScan = quantizeScan(node, NUM_SAMPLES);
-//         // }
-
-//         // Burst end point was reached, turn off motors
-//         // TODO: Turn off motors here
-//     }
-// }
-
-
 int getTurnAngle(Path* path, enum compass* currHeading) {
     Point desiredDir = {.x = path->next->data.x - path->data.x, .y = path->next->data.y - path->data.y};
     int desiredAngle;
@@ -486,36 +342,3 @@ int getTurnAngle(Path* path, enum compass* currHeading) {
 
     return turnAngle;
 }
-
-
-
-
-// // OLD TURNING LOGIC
-
-// // turnLeft == true: turn left          turnLeft == false: turn right
-// bool turnLeft;
-
-// // If burst was in Y direction
-// if(changeYDir != 0) {
-//     int newchangeDir = path->next->data.x - path->data.x;
-//     // If burst was in +Y direction
-//     if(changeYDir > 0) {
-//         turnLeft = newchangeDir > 0? false : true;
-//     }
-//     // If burst was in -Y direction
-//     else {
-//         turnLeft = newchangeDir > 0? true : false;
-//     }
-// }
-// // If burst was in X direction
-// else {
-//     int newchangeDir = path->next->data.y - path->data.y;
-//     // If burst was in +X direction
-//     if(changeXDir > 0) {
-//         turnLeft = newchangeDir > 0? true : false;
-//     }
-//     // If burst was in -X direction
-//     else {
-//         turnLeft = newchangeDir > 0? false : true;
-//     }
-// }

@@ -103,17 +103,6 @@ static int comp (const void *a, const void *b){
     return ((pp*)a)->angle - ((pp*)b)->angle;
 }
 
-// Converts 400 raw data samples (distance & angle) from: array of RPLidar library structs --> array of floats
-// single_scan_data[i] = x   ------>   i = angle, x = distance
-pp* reformatSamples(rplidar_response_measurement_node_t* samples, int numSamples){
-    pp* single_scan_data = (pp*) malloc(sizeof(pp) * numSamples);
-    for(int i = 0; i < numSamples; i++) {
-        single_scan_data[i].angle = (samples[i].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT)/64.0f;
-        single_scan_data[i].distance = samples[i].distance_q2/4.0f;
-    }
-    
-    return single_scan_data;
-}
 
 // (OPTIMIZED) Converts 400 raw data samples (distance & angle) from: array of RPLidar library structs --> array of floats
 // single_scan_reformed[i] = x   ------>   i = angle, x = distance
@@ -142,64 +131,6 @@ void process(pp* input, int size, float* single_scan_data_proc){
     return;
 }
 
-// #define PROCESS_SEARCH_RANGE 6
-// (OPTIMIZED) Downsizes unquantized scan (400 samples) to quantized scan (360 samples)
-// void process(pp* input, int size, float* single_scan_data_proc){
-//     float minAngleDiff = __INT_MAX__;
-//     float minDist = __INT_MAX__;
-//     int min_idx = 0;
-
-//     int i = 0;
-//     int s_idx = size - PROCESS_SEARCH_RANGE;
-//     while (i < PROCESS_SEARCH_RANGE * 2) {
-//         int idx = (s_idx + i) % size;
-//         float diff = (input[idx].angle > 180) ? (360 - input[idx].angle) : input[idx].angle;
-//         if (diff < minAngleDiff) {
-//             minAngleDiff = diff;
-//             minDist = input[idx].distance;
-//             min_idx = idx;
-//         }
-//         i++;
-//     }
-//     single_scan_data_proc[0] = minDist;
-
-//     for (int i = 1; i < FINAL_NUM_POINTS; i++) {
-//         minAngleDiff = __INT_MAX__;
-//         minDist = __INT_MAX__;
-        
-//         int j = 0;
-//         s_idx = min_idx - 1;
-//         while (j < PROCESS_SEARCH_RANGE) {
-//             int idx = (s_idx + j) % size;
-//             int diff = fabs(input[idx].angle - i);
-//             if (diff < minAngleDiff) {
-//                 minAngleDiff = diff;
-//                 minDist = input[idx].distance;
-//                 min_idx = idx;
-//             }
-//             j++;
-//         }
-//         single_scan_data_proc[i] = minDist;
-//     }
-//     return;
-// }
-
-// Quantizes a scan from 400 raw data samples ----> 360 samples that are 0-degree-based
-float* quantizeScan(rplidar_response_measurement_node_t* scanSamples, int numSamples){
-    pp* single_scan_data = reformatSamples(scanSamples, numSamples);
-    qsort(single_scan_data, numSamples, sizeof(pp), comp);
-    float* single_scan_data_proc = (float*) malloc(sizeof(float) * FINAL_NUM_POINTS);
-    process(single_scan_data, numSamples, single_scan_data_proc);
-    // Free single_scan_data and node samples in buffer
-    // for(int i = 0; i < numSamples; i++) {
-    //     //free(&(single_scan_data[i]));
-
-    //     // Don't do this, or else it will free the buffer where scans are read from
-    //     //free(&(scanSamples[i]));
-    // }
-    return single_scan_data_proc;
-}
-//
 
 float* getLiDARScan() {
     int numSamples = NUM_SAMPLES;
@@ -225,76 +156,6 @@ void updateLiDARScan(float* prevScan) {
     qsort(single_scan_reformed, numSamples, sizeof(pp), comp);
     float* single_scan_data_proc = prevScan;
     process(single_scan_reformed, numSamples, single_scan_data_proc);
-}
-
-
-
-// Determine current location by comparing current quantized scan with the quantized initialization scans
-Point getCurrLoc() {    
-    // get lidar scan data (unprocessed)
-    startScan(false, RPLIDAR_DEFAULT_TIMEOUT*2);
-    while(!(IS_OK(grabData(RPLIDAR_DEFAULT_TIMEOUT, buff))));
-    stop();
-    // Quantize current scan (processing)
-    float* procScanSamp = quantizeScan(node, NUM_SAMPLES);
-
-    // // replace them with getLiDARScan();
-    // float* procScanSamp = getLiDARScan();
-
-    // Stats for initialization scan best match
-    int minDiff = INT_MAX;
-    // int final_angle = 0;
-    // int minAngle = 0;
-
-    char bestMatchID = 0;
-    
-    // For each square in floor plan
-    for(int initScanID = 0; initScanID < SQUARES_IN_MAP; initScanID++) {
-        // Skip invalid squares in floor plan
-        if(fplan[initScanID / NCOLS][initScanID % NCOLS] == 1) {
-            // printf("Skipping Obstacle Square (%d, %d)\n", initScanID / NCOLS, initScanID % NCOLS);
-            fflush(stdout);
-            continue;
-        }
-        
-        int minDiffForCurrInitScan = INT_MAX;
-        // minAngle = 0;
-
-        // Compare current quantized scan with quantized initialization scan
-        // Outer for loop: Accounts for bot not facing directly north (simulates angle alignment by altering the current scan's 0-degree-index)
-        //           TODO: modify the zeroDegIdx to be a window based on compass reading
-        for(int zeroDegIdx = 0; zeroDegIdx < FINAL_NUM_POINTS; zeroDegIdx++) {      
-            int diff = 0;
-            // Inner for loop: Compare 360 samples in angle-aligned current scan with those in initialization scan
-            for(int i = 0; i < FINAL_NUM_POINTS; i++) {
-                diff += pow(abs(procScanSamp[(zeroDegIdx + i) % FINAL_NUM_POINTS] - lidar_data[initScanID / NCOLS][initScanID % NCOLS][i]), 1);
-            }
-            if(diff < minDiffForCurrInitScan) {
-                minDiffForCurrInitScan = diff;
-                // minAngle = zeroDegIdx;
-            }
-        }
-        if(minDiffForCurrInitScan < minDiff) {
-            minDiff = minDiffForCurrInitScan;
-            bestMatchID = initScanID;
-            // final_angle = 360 - minAngle;
-            
-        }
-        // printf("\nDiff for (%d, %d): %d\n", initScanID / NCOLS, initScanID % NCOLS, minDiffForCurrInitScan);
-
-    }
-    // free the procScan, sicne we don't need it anymore
-    free(procScanSamp);
-
-    // char angle[4];
-    // snprintf(angle, 4, "%d", final_angle);
-    // prints(angle);
-    // fflush(stdout);
-    
-    Point ret;
-    ret.x = (int) bestMatchID / NROWS;
-    ret.y = (int) bestMatchID % NCOLS;
-    return ret;
 }
 
 float getDistHelper(float * proScanSamp, int refAngle) {
@@ -731,9 +592,6 @@ int angleOffsetHelper(float * lidarScan, int range, enum compass direction) {
     int angle_start = (direction - (range / 2) + FINAL_NUM_POINTS) % FINAL_NUM_POINTS;
 
     int j = 0;
-    // float minDist = __FLT_MAX__;
-    // float max = 0;
-    // float curr = 0;
     float coeff_sin = 0;
     float coeff_cos = 0;
     while (j < range) {
@@ -788,25 +646,11 @@ int angleOffsetHelper(float * lidarScan, int range, enum compass direction) {
     } 
 
     j = 0;
-    // while (j < range) {
-    //     printf("Height: %f, Base: %f\n", height[j], base[j]);
-    //     j++;
-    // }
-
-    // j = maxCountStart;
-    // while (j < maxCountStart + maxCount + 1) {
-    //     printf("MAX Height: %f, Base: %f\n", height[j], base[j]);
-    //     j++;
-    // }
-
     float delatHeight = fabs(height[maxCountStart] - height[maxCountStart + maxCount]);
     float delatBase = fabs(base[maxCountStart] - base[maxCountStart + maxCount]);
     
 
     int angleOffset = abs((atan2(delatHeight, delatBase) * 180 / M_PI) + 0.5);
-    // if (direction == NORTH || direction == SOUTH) {
-    //     angleOffset = 90 - angleOffset;
-    // }
     if (abs(height[maxCountStart]) > abs(height[maxCountStart + maxCount])) {
         angleOffset = -angleOffset;
     }
@@ -856,88 +700,11 @@ int getAngleOffset(rover robot) {
     // get minimum of f b r l
     direction = (direction + 360 - robot.heading) % 360;
     printf("Looking at Direction: %d\n", direction);
-    // int range = (int) ((atan2(ROBOT_LENGTH / 2, ref) * 180 / M_PI) + 0.5);
     float * lidarScan = getLiDARScan();
     int angleOffset = angleOffsetHelper(lidarScan, 45, direction);
     free(lidarScan);
     return angleOffset;
 }
-
-
-// Determine current location by comparing current quantized scan with the quantized initialization scans
-Point get_curr_loc(int * angleReturn, Point * secondClose) {    
-    float* procScanSamp = getLiDARScan();
-
-    // Stats for initialization scan best match
-    int minDiff = INT_MAX;
-    int prevMinDiff = INT_MAX;
-    int final_angle = 0;
-    int minAngle = 0;
-
-    char bestMatchID = 0;
-    char preBestMatchID = 0;
-    
-    // For each square in floor plan
-    for(int initScanID = 0; initScanID < SQUARES_IN_MAP; initScanID++) {
-        // Skip invalid squares in floor plan
-        if(fplan[initScanID / NCOLS][initScanID % NCOLS] == 1) {
-            // printf("Skipping Obstacle Square (%d, %d)\n", initScanID / NCOLS, initScanID % NCOLS);
-            fflush(stdout);
-            continue;
-        }
-        
-        int minDiffForCurrInitScan = INT_MAX;
-        minAngle = 0;
-
-        // Compare current quantized scan with quantized initialization scan
-        // Outer for loop: Accounts for bot not facing directly north (simulates angle alignment by altering the current scan's 0-degree-index)
-        //           TODO: modify the zeroDegIdx to be a window based on compass reading
-        for(int zeroDegIdx = 0; zeroDegIdx < FINAL_NUM_POINTS; zeroDegIdx++) {      
-            int diff = 0;
-            // Inner for loop: Compare 360 samples in angle-aligned current scan with those in initialization scan
-            for(int i = 0; i < FINAL_NUM_POINTS; i++) {
-                diff += pow(abs(procScanSamp[(zeroDegIdx + i) % FINAL_NUM_POINTS] - lidar_data[initScanID / NCOLS][initScanID % NCOLS][i]), 1);
-            }
-            if(diff < minDiffForCurrInitScan) {
-                minDiffForCurrInitScan = diff;
-                minAngle = zeroDegIdx;
-            }
-        }
-        if(minDiffForCurrInitScan < minDiff) {
-            prevMinDiff = minDiff;
-            minDiff = minDiffForCurrInitScan;
-            preBestMatchID = bestMatchID;
-            bestMatchID = initScanID;
-            final_angle = 360 - minAngle;    
-        }
-        // printf("\nDiff for (%d, %d): %d\n", initScanID / NCOLS, initScanID % NCOLS, minDiffForCurrInitScan);
-
-    }
-    // free the procScan, sicne we don't need it anymore
-    free(procScanSamp);
-
-    char angle[4];
-    snprintf(angle, 4, "%d", final_angle);
-    prints(angle);
-    fflush(stdout);
-    
-    Point ret;
-    ret.x = (int) bestMatchID / NROWS;
-    ret.y = (int) bestMatchID % NCOLS;
-    *angleReturn = final_angle;
-
-    secondClose->x = (int) preBestMatchID / NROWS;
-    secondClose->y = (int) preBestMatchID % NCOLS;
-
-    if (prevMinDiff - minDiff >= SIMILAR_THRESH) {
-        secondClose->x = -1;
-        secondClose->y = -1;
-    }
-
-    return ret;
-}
-
-
 
 Point get_curr_loc_input(enum compass heading, int* angleReturn, Point * secondClose) {    
     float* procScanSamp = getLiDARScan();
@@ -1020,97 +787,3 @@ Point get_curr_loc_input(enum compass heading, int* angleReturn, Point * secondC
 
     return ret;
 }
-
-
-
-Point get_curr_loc_input_2(enum compass heading, int* angleReturn, Point * secondClose) {    
-    float* procScanSamp = getLiDARScan();
-
-    // Stats for initialization scan best match
-    int minDiff = INT_MAX;
-    int prevMinDiff = INT_MAX;
-    int final_angle = 0;
-    int minAngle = 0;
-
-    char bestMatchID = 0;
-    char preBestMatchID = 0;
-    
-    // For each square in floor plan
-    for(int initScanID = 0; initScanID < SQUARES_IN_MAP; initScanID++) {
-        // Skip invalid squares in floor plan
-        if(fplan[initScanID / NCOLS][initScanID % NCOLS] == 1) {
-            // printf("Skipping Obstacle Square (%d, %d)\n", initScanID / NCOLS, initScanID % NCOLS);
-            fflush(stdout);
-            continue;
-        }
-        
-        int minDiffForCurrInitScan = INT_MAX;
-        minAngle = 0;
-
-        // Compare current quantized scan with quantized initialization scan
-        // Outer for loop: Accounts for bot not facing directly north (simulates angle alignment by altering the current scan's 0-degree-index)
-        //           TODO: modify the zeroDegIdx to be a window based on compass reading
-        int zeroDegIdx = 0;
-        if (heading == NORTH) {
-            zeroDegIdx = 360 - (SEARCH_DEGREE_RANGE / 2);
-        } else if (heading == WEST) {
-            zeroDegIdx = 90 - (SEARCH_DEGREE_RANGE / 2);
-        } else if (heading == SOUTH) {
-            zeroDegIdx = 180 - (SEARCH_DEGREE_RANGE / 2);
-        } else if (heading == EAST) {
-            zeroDegIdx = 270 - (SEARCH_DEGREE_RANGE / 2);
-        }
-
-        int j = 0;
-        while(j < SEARCH_DEGREE_RANGE) {     
-            double diff = 0;
-            float last_nonZero = 300;
-            // Inner for loop: Compare 360 samples in angle-aligned current scan with those in initialization scan
-            for(int i = 0; i < FINAL_NUM_POINTS; i++) {
-                double temp = pow((procScanSamp[(zeroDegIdx + j + i) % FINAL_NUM_POINTS] - lidar_data[initScanID / NCOLS][initScanID % NCOLS][i]), 2);
-                float div = lidar_data[initScanID / NCOLS][initScanID % NCOLS][i];
-                if (div == 0) {
-                    div = last_nonZero; 
-                } else {
-                    last_nonZero = div;
-                }
-                diff += abs(temp / last_nonZero);
-                // diff += pow(abs(procScanSamp[(zeroDegIdx + j + i) % FINAL_NUM_POINTS] - lidar_data[initScanID / NCOLS][initScanID % NCOLS][i]), 1);
-            }
-            if(diff < minDiffForCurrInitScan) {
-                minDiffForCurrInitScan = diff;
-                minAngle = zeroDegIdx + j;
-            }
-            j++;
-        }
-        if(minDiffForCurrInitScan < minDiff) {
-            prevMinDiff = minDiff;
-            minDiff = minDiffForCurrInitScan;
-            preBestMatchID = bestMatchID;
-            bestMatchID = initScanID;
-            final_angle = 360 - minAngle;
-        }
-        
-
-    }
-    printf("\nDiff for (%d, %d): %d\n", bestMatchID / NCOLS, bestMatchID % NCOLS, minDiff);
-    // printf("Diff for (%d, %d): %d\n", preBestMatchID / NCOLS, preBestMatchID % NCOLS, prevMinDiff);
-    // printf("Diff == %d\n\n", prevMinDiff - minDiff);
-    // free the procScan, sicne we don't need it anymore
-    free(procScanSamp);
-    
-    Point ret;
-    ret.x = (int) bestMatchID / NROWS;
-    ret.y = (int) bestMatchID % NCOLS;
-    secondClose->x = (int) preBestMatchID / NROWS;
-    secondClose->y = (int) preBestMatchID % NCOLS;
-    *angleReturn = final_angle;
-
-    if (abs(prevMinDiff - minDiff) >= SIMILAR_THRESH) {
-        secondClose->x = -1;
-        secondClose->y = -1;
-    }
-
-    return ret;
-}
-
