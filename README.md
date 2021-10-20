@@ -25,3 +25,7 @@ Indoor delivery bot
     idf.py build
     idf.py -p PORT flash monitor
     ```
+    
+## Demo
+
+[![Working example](https://img.youtube.com/vi/mLd8BgoYLkw/0.jpg)](https://www.youtube.com/watch?v=mLd8BgoYLkw)
